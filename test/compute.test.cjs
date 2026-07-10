@@ -20,6 +20,8 @@ console.log("compute.js gate:");
 // 1. Weights math exact (definitional: params_b * bytes/param)
 ok("weights = params*2 (fp16)", near(compute(M("qwen3-8b"), G("h100-80"), "fp16", 8192, 1, null, 1).weightsGB, M("qwen3-8b").total_params_b * 2));
 ok("weights = params*0.5 (int4)", near(compute(M("qwen3-8b"), G("h100-80"), "int4", 8192, 1, null, 1).weightsGB, M("qwen3-8b").total_params_b * 0.5));
+ok("weights = params*0.5625 (nvfp4)", near(compute(M("qwen3-8b"), G("b200"), "nvfp4", 8192, 1, null, 1).weightsGB, M("qwen3-8b").total_params_b * 0.5625));
+ok("nvfp4 > int4 weights (block-scale overhead)", compute(M("qwen3-8b"), G("b200"), "nvfp4", 8192, 1, null, 1).weightsGB > compute(M("qwen3-8b"), G("b200"), "int4", 8192, 1, null, 1).weightsGB);
 
 // 2. Single-GPU fit for a mid dense model; small model = 1 GPU
 ok("Qwen3.6-27B int4 fits H100-80 @8k", compute(M("qwen3.6-27b"), G("h100-80"), "int4", 8192, 1, null, 1).fits === true);

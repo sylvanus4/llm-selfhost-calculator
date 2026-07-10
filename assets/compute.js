@@ -1,7 +1,10 @@
 /* Pure estimation core — no DOM, no I/O. Usable in the browser (global) and in Node (module.exports)
    so the same code path is unit-tested (test/compute.test.mjs) and shipped. */
 (function (root) {
-  const BYTES_PER_PARAM = { fp16: 2, int8: 1, int4: 0.5 };
+  // bytes/param including block-scale overhead where it applies:
+  //   fp16/bf16 = 16-bit; fp8/int8 = 8-bit; int4 = idealized W4 (0.5);
+  //   nvfp4 = FP4 E2M1 + FP8 per-16 block scale = 4.5 bit; mxfp4 = FP4 + E8M0 per-32 scale = 4.25 bit.
+  const BYTES_PER_PARAM = { fp16: 2, fp8: 1, int8: 1, nvfp4: 0.5625, mxfp4: 0.53125, int4: 0.5 };
   const KV_BYTES = 2;    // fp16 KV cache
   const MBU = 0.5;       // single-stream memory-bandwidth utilization (conservative)
   const BATCH_EFF = 0.7; // batching efficiency for aggregate serving throughput

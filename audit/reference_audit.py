@@ -16,7 +16,7 @@ ROOT = Path(__file__).resolve().parents[1]
 models = {m["id"]: m for m in json.loads((ROOT / "data/models.json").read_text())["models"]}
 gpus = {g["id"]: g for g in json.loads((ROOT / "data/gpus.json").read_text())["gpus"]}
 
-BPP = {"fp16": 2, "int8": 1, "int4": 0.5}
+BPP = {"fp16": 2, "fp8": 1, "int8": 1, "nvfp4": 0.5625, "mxfp4": 0.53125, "int4": 0.5}
 KV_BYTES = 2
 MBU = 0.5
 BATCH_EFF = 0.7
@@ -77,6 +77,8 @@ print("== ANCHORS (hand-computed truth) ==")
 # A1 weights: 8B fp16 = 16GB, int4 = 4GB
 check("8B fp16 weights = 16.0", near(8 * 2, 16.0))
 check("8B int4 weights = 4.0", near(8 * 0.5, 4.0))
+check("8B nvfp4 weights = 4.5", near(8 * 0.5625, 4.5))
+check("8B mxfp4 weights = 4.25", near(8 * 0.53125, 4.25))
 # A2 KV: layers36 kv_dim1024 fp16 @8192 = 1.20795 GB (2*36*1024*2*8192/1e9)
 check("KV(36L,1024,8192) = 1.20795GB", near(2 * 36 * 1024 * 2 * 8192 / 1e9, 1.20795, rel=1e-4))
 # A3 cost: rent2.5, 100 tok/s, 1 gpu -> $6.9444 / 1M

@@ -12,6 +12,8 @@ const scenarios = [
   { gpu: "h200", quant: "fp16", ctx: 32768, conc: 1, api: 0.8 },
   { gpu: "rtx4090", quant: "int4", ctx: 4096, conc: 8, api: 0.5 },
   { gpu: "m2-ultra-192", quant: "int4", ctx: 8192, conc: 1, api: 0.8 },
+  { gpu: "b200", quant: "nvfp4", ctx: 8192, conc: 32, api: 0.8 },
+  { gpu: "gb300", quant: "mxfp4", ctx: 16384, conc: 16, api: 0.8 },
 ];
 
 const out = [];

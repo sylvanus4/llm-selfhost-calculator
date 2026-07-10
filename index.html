@@ -20,10 +20,13 @@
     <div class="chips" id="modelChips"></div>
     <div class="model-note" id="modelNote"></div>
 
-    <label>양자화
+    <label>양자화 <span class="hint">4-bit는 아래 설명 참고</span>
       <select id="quant">
-        <option value="fp16">FP16 (2 bytes/param)</option>
-        <option value="int8">INT8 (1 byte)</option>
+        <option value="fp16">FP16 / BF16 (2 bytes/param)</option>
+        <option value="fp8">FP8 E4M3 (1 byte · Hopper·Blackwell)</option>
+        <option value="int8">INT8 (1 byte · SmoothQuant)</option>
+        <option value="nvfp4">NVFP4 (0.56 byte · Blackwell FP4)</option>
+        <option value="mxfp4">MXFP4 (0.53 byte · OCP microscaling)</option>
         <option value="int4">INT4 / AWQ·GPTQ (0.5 byte)</option>
       </select>
     </label>
@@ -99,6 +102,20 @@
       <li><b>손익분기</b>: 자체호스팅 $/1M = <code>(렌트/시간 ÷ 3600) ÷ 처리량 × 1e6</code>. 이 값이 API 단가보다 낮으면(=GPU를 충분히 채우면) 자체호스팅이 쌉니다.</li>
     </ul>
     <p class="dim">모두 <b>근사 추정</b>입니다. 실제 수치는 커널·프레임워크·페이징·양자화 방식에 따라 달라집니다. 의사결정 전 실측 벤치를 권장합니다.</p>
+  </details>
+  <details>
+    <summary>양자화 기법 가이드 (NVFP4·MXFP4·FP8·INT4 …)</summary>
+    <p class="dim">양자화 = 가중치(와 활성값)를 더 적은 비트로 저장해 <b>VRAM과 메모리 대역폭</b>을 줄이는 것. 디코딩은 대역폭에 묶이므로, 절반 비트로 줄이면 VRAM만이 아니라 <b>tok/s도 대략 그만큼 빨라집니다</b>. 위 양자화 선택이 <code>bytes/param</code>을 바꿔 두 값 모두에 반영됩니다.</p>
+    <ul>
+      <li><b>bytes/param</b>: FP16·BF16 <code>2</code> · FP8·INT8 <code>1</code> · <b>NVFP4 <code>~0.5625</code></b>(4.5bit) · MXFP4 <code>~0.53125</code>(4.25bit) · INT4 <code>0.5</code>. 4-bit 포맷은 4비트 데이터에 <b>블록 스케일</b>이 붙어 정확히 0.5는 아닙니다 — 계산기는 이 오버헤드를 반영합니다.</li>
+      <li><b>NVFP4</b> (NVIDIA): FP4 <code>E2M1</code> 값 + <b>16개마다 FP8(E4M3) 블록 스케일</b> + 텐서당 FP32 스케일 → 유효 4.5bit. Blackwell(B200/B300/GB200/GB300·RTX PRO 6000·RTX 50) FP4 텐서코어에서 하드웨어 가속되며, FP8에 근접한 정확도를 4-bit 크기로 냅니다. TensorRT-Model-Optimizer로 PTQ.</li>
+      <li><b>MXFP4</b> (OCP Microscaling): FP4 + <b>32개마다 E8M0 블록 스케일</b> → 유효 4.25bit. OpenAI <code>gpt-oss</code>의 기본 포맷. Blackwell/일부 최신 하드웨어에서 가속.</li>
+      <li><b>FP8</b> (E4M3/E5M2): 8-bit 부동소수. Hopper(H100/H200)·Blackwell 네이티브. 거의 무손실에 가까워 서빙 기본값으로 인기(가중치+KV+활성값 모두 FP8 가능).</li>
+      <li><b>INT4 계열 PTQ</b>: <b>GPTQ</b>(2차 헤시안 기반 반올림), <b>AWQ</b>(활성값-인지 채널 스케일), <b>AutoRound</b>, <b>HQQ</b>(캘리브레이션 없이 빠름), <b>bitsandbytes NF4</b>(QLoRA 학습용). <b>SmoothQuant</b>는 활성 이상치를 가중치로 이전해 INT8을 매끄럽게. <b>QuaRot·SpinQuant</b>는 회전으로 이상치를 눌러 4-bit 정확도를 끌어올림.</li>
+      <li><b>GGUF k-quants</b> (llama.cpp): <code>Q4_K_M</code>·<code>Q5_K_M</code>·<code>Q6_K</code> 등 블록·혼합정밀. Apple·CPU·소비자 GPU 자체호스팅의 사실상 표준. <code>Q4_K_M</code> ≈ 4.5bit로 NVFP4와 비슷한 크기.</li>
+      <li><b>더 낮은 비트</b>: INT2·<b>1.58-bit(BitNet)</b>·2-bit AQLM/QuIP# 도 있으나 정확도 손실이 커 대개 특수용도. 계산기는 다루지 않습니다.</li>
+      <li><b>주의</b>: 위 tok/s 이득은 <b>메모리 절감</b> 기준입니다. NVFP4/MXFP4는 <b>FP4 텐서코어가 있어야</b> 연산까지 가속되고(없으면 메모리 이득만), INT4는 Marlin 등 최적화 커널이 필요합니다. KV 캐시는 계산기가 FP16으로 잡지만 실제로는 FP8/INT8로도 줄일 수 있습니다.</li>
+    </ul>
   </details>
 </section>
 
