@@ -21,6 +21,8 @@
 
 **최신 인기 모델 18종을 최신순으로 내장** — GLM-5.2, Kimi K2.7, **NVIDIA Nemotron 3(Ultra·Super·Nano)**, DeepSeek-V4(Pro/Flash), Qwen3.6(27B·35B-A3B), MiniMax-M2.7, Gemma 4(31B·26B-A4B·12B·E4B), **Mistral Devstral Small 2 24B**, **IBM Granite 4.0 H Small**, **OpenAI gpt-oss-120b**, Qwen3-8B. 스펙(layers/hidden/kv_dim/context)은 각 모델 HF `config.json`에서 확인했습니다. 가속기 25종 내장 — NVIDIA Blackwell(GB300·GB200·B300·B200·RTX PRO 6000·DGX Spark), Hopper/Ampere(H200·H100·A100·L40S·A6000·4090·3090·L4), **AMD Instinct(MI355X·MI325X·MI300X)**, Apple M-시리즈, 그리고 **추론 NPU(FuriosaAI RNGD·Rebellions Rebel100·Intel Gaudi 3·AWS Trainium2, 최신 HBM 탑재)**. 소유/온프렘 기기(Apple·DGX Spark·NPU)는 렌트가 없어 전기요금 비교로 안내합니다. 값은 UI에서 덮어쓸 수 있습니다.
 
+**양자화 6종 + 기법 가이드** — FP16/BF16 · FP8 · INT8 · **NVFP4**(Blackwell FP4, 4.5bit) · **MXFP4**(OCP microscaling, gpt-oss 기본) · INT4를 선택해 VRAM·tok/s를 즉시 비교. 4-bit 포맷의 **블록 스케일 오버헤드**(NVFP4는 FP8 per-16 스케일 → 정확히 0.5가 아닌 0.5625 byte)까지 반영합니다. 하단 "양자화 기법 가이드"에서 GPTQ·AWQ·SmoothQuant·GGUF k-quants·QuaRot 등 PTQ 방법과 하드웨어 요구(FP4 텐서코어 등)를 설명합니다.
+
 **비교 API 단가도 최신 실제 가격으로 갱신** — Claude(Opus 4.8·Sonnet 5·Haiku 4.5·Fable 5), GPT-5.5·5.6, Grok 4.5·4.3의 입력/출력 단가와 blended $/1M을 내장(공개 리스트가, 2026-07 기준). blended = `(3×입력 + 출력) / 4`(입력 3:1 가중, RAG/에이전틱 사용 기준). 하단에 **이미지 생성(gpt-image-2 등)·음성 STT/TTS 참고 패널**을 추가 — 자체호스팅 음성 모델(Whisper·Qwen3-ASR·Parakeet·Canary / VoxCPM2·Qwen3-TTS·Kokoro·Chatterbox·Orpheus·F5-TTS)과 음성 API 가격(OpenAI·ElevenLabs·Deepgram·AssemblyAI·xAI 등)을 정리했습니다. 이들은 토큰 단위가 아니라 토큰 계산기와 1:1 비교되지 않으므로 별도 참고용입니다.
 
 > MLA(Kimi·DeepSeek)는 압축 KV 캐시를, GLM-5.2는 희소 어텐션(DSA)을, Nemotron 3·Granite 4·gpt-oss는 하이브리드 Mamba/슬라이딩윈도우를 씁니다. 하이브리드 Mamba 모델은 어텐션 층에만 KV가 붙으므로 `n_layers`를 어텐션 층 수로 잡아 반영했고, 나머지는 보수적 상한 근사입니다.
@@ -29,7 +31,7 @@
 
 | 항목 | 근사식 |
 |---|---|
-| 가중치 VRAM | `total_params × bytes/param` (fp16=2, int8=1, int4=0.5) |
+| 가중치 VRAM | `total_params × bytes/param` (fp16/bf16=2, fp8/int8=1, **nvfp4≈0.5625**, mxfp4≈0.53125, int4=0.5) |
 | KV 캐시 | `2 × layers × kv_dim × 2B × context` (GQA의 kv_dim 반영) |
 | 오버헤드 | `1.2GB + 5% × 가중치` |
 | 단일 tok/s | `MBU(0.5) × 메모리대역폭 ÷ (활성 파라미터 × bytes)` — MoE는 활성 파라미터만 |
