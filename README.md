@@ -15,11 +15,13 @@
 
 ## 무엇을 계산하나
 
-- **VRAM 적합성** — 가중치 + KV 캐시(컨텍스트 길이 반영) + 오버헤드를 장비 VRAM과 비교. 들어가는지/넘치는지 즉시 표시.
-- **추론 속도** — 단일 스트림 디코딩 tok/s(메모리 대역폭 기반)와 배치 서빙 총 처리량.
-- **자체호스팅 vs API 손익분기** — GPU 시간당 렌트비와 처리량으로 자체호스팅 $/1M 토큰을 구해 API 단가와 비교, "API를 이기려면 필요한 처리량"까지.
+- **VRAM 적합성 + 필요 GPU 수** — 가중치 + KV 캐시(컨텍스트 반영) + 오버헤드를 장비 VRAM과 비교. 한 장에 들어가면 ✅, 넘치면 **몇 장이 필요한지(텐서 병렬)** 를 계산. Kimi K2.7(1T)·DeepSeek-V4(1.6T) 같은 초거대 MoE도 다룹니다.
+- **추론 속도** — 단일 스트림 디코딩 tok/s(메모리 대역폭 기반, 멀티 GPU면 합산 대역폭)와 배치 서빙 총 처리량.
+- **자체호스팅 vs API 손익분기** — GPU 렌트비(필요 대수 반영)와 처리량으로 자체호스팅 $/1M 토큰을 구해 API 단가와 비교, "API를 이기려면 필요한 처리량"까지.
 
-16개 인기 오픈 모델(Llama, Qwen, Mistral/Mixtral, GLM, Gemma, Phi, gpt-oss, DeepSeek, MoE 포함)과 12종 가속기(H200/H100/A100/L40S/4090/3090/L4 + Apple M-시리즈)를 내장. 값은 UI에서 덮어쓸 수 있습니다.
+**최신 인기 모델을 최신순으로 내장** — GLM-5.2, Kimi K2.7, DeepSeek-V4(Pro/Flash), Qwen3.6(27B·35B-A3B), MiniMax-M2.7, Gemma 4(31B·26B-A4B·12B·E4B), Qwen3-8B. 스펙(layers/hidden/kv_dim/context)은 각 모델 HF `config.json`에서 확인했습니다. 가속기 12종(H200/H100/A100/L40S/4090/3090/L4 + Apple M-시리즈) 내장. 값은 UI에서 덮어쓸 수 있습니다.
+
+> MLA(Kimi·DeepSeek)는 압축 KV 캐시를, GLM-5.2는 희소 어텐션(DSA)을 씁니다. KV 추정은 이를 반영한 보수적 근사이며 실제와 다를 수 있습니다.
 
 ## 계산 방식 (투명하게) · How the math works
 
@@ -56,6 +58,13 @@ CI(`.github/workflows/validate.yml`)가 매 푸시마다 이 테스트 + JSON/HT
 ## 데이터 추가
 
 `data/models.json`·`data/gpus.json`·`data/api-prices.json`에 항목을 추가하면 UI에 즉시 반영됩니다. 값은 공개 스펙 기반 근사이며, PR 환영합니다.
+
+## Security & Privacy / 보안과 개인정보
+
+**100% 클라이언트 사이드 정적 사이트** — 백엔드·빌드·의존성·API 키·트래킹이 없습니다. 모든 계산은 브라우저에서 실행되며 **입력값은 어디로도 전송되지 않습니다.** 정적 JSON(모델·GPU·가격 표)만 읽습니다.
+*100% client-side: no backend, no build, no dependencies, no API keys, no tracking. Every calculation runs in your browser and nothing you enter is ever sent anywhere.*
+
+위협 표면·데이터 처리·취약점 신고 방법은 [`SECURITY.md`](./SECURITY.md)를 참고하세요. 모든 수치는 계획용 추정치이니 실제 결정 전 공급사 가격으로 검증하세요.
 
 ## 라이선스 · 면책
 
