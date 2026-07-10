@@ -16,7 +16,8 @@
 <main id="app">
   <section class="panel inputs">
     <h2>입력</h2>
-    <label>모델 <select id="model"></select></label>
+    <label>모델 <span class="hint">최신순</span> <select id="model"></select></label>
+    <div class="chips" id="modelChips"></div>
     <div class="model-note" id="modelNote"></div>
 
     <label>양자화
@@ -30,7 +31,7 @@
     <label>하드웨어 <select id="gpu"></select></label>
 
     <label>컨텍스트 길이 <span class="lab" id="contextLabel"></span>
-      <input type="range" id="context" min="2048" max="131072" step="2048" value="8192">
+      <input type="range" id="context" min="2048" max="262144" step="2048" value="8192">
     </label>
 
     <label>동시 요청 <span class="lab" id="concurrencyLabel"></span>

@@ -13,25 +13,35 @@
     const kvPerTokenGB = (2 * model.n_layers * model.kv_dim * KV_BYTES) / 1e9;
     const overheadGB = 1.2 + 0.05 * weightsGB;
     const kvSingleGB = kvPerTokenGB * context;
-    const vramSingle = weightsGB + kvSingleGB + overheadGB;
-    const fits = vramSingle <= gpu.vram_gb;
+    const vramSingle = weightsGB + kvSingleGB + overheadGB;      // to hold weights + one full-context sequence
+    const fits = vramSingle <= gpu.vram_gb;                       // fits on ONE device?
 
-    const freeForKV = gpu.vram_gb - weightsGB - overheadGB;
+    // How many of this device to hold weights + one sequence (tensor/pipeline parallel).
+    const gpusNeeded = Math.max(1, Math.ceil(vramSingle / gpu.vram_gb));
+    const totalVram = gpusNeeded * gpu.vram_gb;
+
+    // Aggregate memory bandwidth scales with device count, minus tensor-parallel comm overhead.
+    const tpEff = gpusNeeded > 1 ? 0.8 : 1;
+    const aggBandwidth = gpu.bandwidth_gbs * gpusNeeded * tpEff;
+
+    const freeForKV = totalVram - weightsGB - overheadGB;
     const maxBatch = freeForKV > 0 ? Math.floor(freeForKV / kvSingleGB) : 0;
 
-    const singleTokS = (MBU * gpu.bandwidth_gbs) / activeGB;
+    const singleTokS = (MBU * aggBandwidth) / activeGB;           // decode is bandwidth-bound on ACTIVE weights
     const effBatch = Math.max(1, Math.min(concurrency, maxBatch || 1));
     const servingTokS = singleTokS * effBatch * BATCH_EFF;
 
     const rent = rentOverride != null && !isNaN(rentOverride) ? rentOverride : gpu.rent_usd_hr;
-    let selfHostPer1m = null, requiredTokS = null, verdict = null;
+    let selfHostPer1m = null, requiredTokS = null, verdict = null, fleetRentHr = null;
     if (rent != null) {
-      selfHostPer1m = ((rent / 3600) / servingTokS) * 1e6;
-      requiredTokS = (rent / 3600) / (apiPer1m / 1e6);
+      fleetRentHr = rent * gpusNeeded;                            // renting the whole fleet
+      selfHostPer1m = ((fleetRentHr / 3600) / servingTokS) * 1e6;
+      requiredTokS = (fleetRentHr / 3600) / (apiPer1m / 1e6);
       verdict = servingTokS >= requiredTokS ? "self" : "api";
     }
     return { bpp, weightsGB, activeGB, kvPerTokenGB, overheadGB, kvSingleGB, vramSingle, fits,
-      maxBatch, singleTokS, effBatch, servingTokS, rent, selfHostPer1m, requiredTokS, verdict };
+      gpusNeeded, totalVram, aggBandwidth, freeForKV, maxBatch, singleTokS, effBatch, servingTokS,
+      rent, fleetRentHr, selfHostPer1m, requiredTokS, verdict };
   }
 
   const api = { compute, BYTES_PER_PARAM, KV_BYTES, MBU, BATCH_EFF };

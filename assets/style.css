@@ -22,9 +22,12 @@ select, input[type=text] { width: 100%; margin-top: 5px; padding: 9px 10px; back
   border: 1px solid var(--border); border-radius: 8px; font-size: 14px; font-family: var(--sans); min-height: 40px; }
 input[type=range] { width: 100%; margin-top: 8px; accent-color: var(--accent); }
 .lab { color: var(--text); font-weight: 600; float: right; font-family: var(--mono); }
-.model-note { font-size: 12px; color: var(--dim); margin: -6px 0 14px; }
+.model-note { font-size: 12px; color: var(--dim); margin: 2px 0 14px; }
 .model-note a { color: var(--accent); }
 .model-note .warn { color: var(--k); }
+.hint { font-size: 10px; color: var(--accent); background: color-mix(in srgb, var(--accent) 14%, transparent); padding: 1px 6px; border-radius: 999px; letter-spacing: 0; text-transform: none; }
+.chips { display: flex; flex-wrap: wrap; gap: 5px; margin: 8px 0 4px; }
+.chip { font-size: 10.5px; font-family: var(--mono); color: var(--dim); background: var(--panel2); border: 1px solid var(--border); padding: 2px 7px; border-radius: 999px; }
 
 .block { border-top: 1px solid var(--border); padding-top: 14px; margin-top: 14px; }
 .block:first-of-type { border-top: 0; margin-top: 0; padding-top: 0; }
@@ -35,6 +38,8 @@ input[type=range] { width: 100%; margin-top: 8px; accent-color: var(--accent); }
 .badge { font-size: 13px; padding: 3px 10px; border-radius: 999px; font-weight: 600; }
 .badge.ok { color: var(--ok); background: color-mix(in srgb, var(--ok) 15%, transparent); }
 .badge.no { color: var(--no); background: color-mix(in srgb, var(--no) 15%, transparent); }
+.badge.multi { color: var(--accent); background: color-mix(in srgb, var(--accent) 15%, transparent); }
+.badge.multi b { font-family: var(--mono); }
 
 .vram-bar { position: relative; height: 26px; background: var(--panel2); border-radius: 6px; overflow: hidden; display: flex; }
 .vram-bar .seg { height: 100%; }
