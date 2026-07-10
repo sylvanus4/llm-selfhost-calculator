@@ -1,0 +1,18 @@
+{
+  "_note": "Accelerators for LLM inference. vram_gb usable HBM/unified. bandwidth_gbs = memory bandwidth. rent_usd_hr = approximate community/cloud on-demand rate (varies widely by provider/region; override in the UI). Apple unified-memory machines are owned devices (rent null) — compare electricity, not rental. Figures are public approximations for estimation.",
+  "_updated": "2026-07-10",
+  "gpus": [
+    {"id": "h200", "name": "NVIDIA H200 (141GB)", "vram_gb": 141, "bandwidth_gbs": 4800, "rent_usd_hr": 3.5, "kind": "gpu"},
+    {"id": "h100-80", "name": "NVIDIA H100 80GB SXM", "vram_gb": 80, "bandwidth_gbs": 3350, "rent_usd_hr": 2.5, "kind": "gpu"},
+    {"id": "a100-80", "name": "NVIDIA A100 80GB", "vram_gb": 80, "bandwidth_gbs": 2039, "rent_usd_hr": 1.8, "kind": "gpu"},
+    {"id": "a100-40", "name": "NVIDIA A100 40GB", "vram_gb": 40, "bandwidth_gbs": 1555, "rent_usd_hr": 1.3, "kind": "gpu"},
+    {"id": "l40s", "name": "NVIDIA L40S (48GB)", "vram_gb": 48, "bandwidth_gbs": 864, "rent_usd_hr": 1.0, "kind": "gpu"},
+    {"id": "a6000", "name": "NVIDIA RTX A6000 (48GB)", "vram_gb": 48, "bandwidth_gbs": 768, "rent_usd_hr": 0.8, "kind": "gpu"},
+    {"id": "rtx4090", "name": "NVIDIA RTX 4090 (24GB)", "vram_gb": 24, "bandwidth_gbs": 1008, "rent_usd_hr": 0.4, "kind": "gpu"},
+    {"id": "rtx3090", "name": "NVIDIA RTX 3090 (24GB)", "vram_gb": 24, "bandwidth_gbs": 936, "rent_usd_hr": 0.3, "kind": "gpu"},
+    {"id": "l4", "name": "NVIDIA L4 (24GB)", "vram_gb": 24, "bandwidth_gbs": 300, "rent_usd_hr": 0.5, "kind": "gpu"},
+    {"id": "m4-max-128", "name": "Apple M4 Max (128GB)", "vram_gb": 110, "bandwidth_gbs": 546, "rent_usd_hr": null, "kind": "apple"},
+    {"id": "m3-max-128", "name": "Apple M3 Max (128GB)", "vram_gb": 110, "bandwidth_gbs": 400, "rent_usd_hr": null, "kind": "apple"},
+    {"id": "m2-ultra-192", "name": "Apple M2 Ultra (192GB)", "vram_gb": 170, "bandwidth_gbs": 800, "rent_usd_hr": null, "kind": "apple"}
+  ]
+}

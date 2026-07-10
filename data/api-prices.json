@@ -1,0 +1,11 @@
+{
+  "_note": "Representative hosted API prices for comparable open models, USD per 1M tokens (blended input+output, order-of-magnitude). Real prices vary by provider and change often — override with your own quote in the UI.",
+  "_updated": "2026-07-10",
+  "presets": [
+    {"label": "Hosted 8B-class (e.g. Llama 3.1 8B)", "usd_per_1m": 0.18},
+    {"label": "Hosted 70B-class (e.g. Llama 3.3 70B)", "usd_per_1m": 0.80},
+    {"label": "Hosted 72B-class (e.g. Qwen2.5 72B)", "usd_per_1m": 1.20},
+    {"label": "Hosted MoE mid (e.g. Mixtral 8x7B)", "usd_per_1m": 0.55},
+    {"label": "Frontier closed API (GPT-4o class)", "usd_per_1m": 6.00}
+  ]
+}
