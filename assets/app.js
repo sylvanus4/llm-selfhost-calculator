@@ -79,7 +79,8 @@ function render() {
   }
 
   const moeNote = model.moe ? ` · MoE: 메모리는 전체 ${fmt(model.total_params_b, 0)}B를 싣지만 디코딩은 활성 ${fmt(model.active_params_b, 1)}B만 → tok/s가 빠릅니다.` : "";
-  el("modelNote").innerHTML = `<a href="https://huggingface.co/${model.hf}" target="_blank" rel="noopener">${model.hf}</a>${moeNote}`;
+  const kvNote = model.note ? ` · <span class="warn">${model.note}</span>` : "";
+  el("modelNote").innerHTML = `<a href="https://huggingface.co/${model.hf}" target="_blank" rel="noopener">${model.hf}</a>${moeNote}${kvNote}`;
   if (context > model.context) el("modelNote").innerHTML += ` <span class="warn">⚠️ 선택 컨텍스트가 모델 최대(${model.context.toLocaleString()})를 초과</span>`;
 }
 
