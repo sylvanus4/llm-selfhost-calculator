@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>LLM 자체호스팅 계산기 · Self-Host Feasibility & Cost</title>
+<meta name="description" content="이 LLM, 내 GPU/맥에서 돌아갈까? API보다 쌀까? VRAM 적합성·토큰속도·자체호스팅 vs API 손익분기를 브라우저에서 즉시 계산. 키 없음, 데이터 전송 없음.">
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<header>
+  <h1>LLM 자체호스팅 계산기</h1>
+  <p class="sub">이 모델, 내 하드웨어에서 돌아갈까? API보다 쌀까? — VRAM 적합성 · 토큰 속도 · 손익분기를 즉시 계산합니다. <b>키 없음 · 서버 없음 · 데이터 전송 없음.</b></p>
+</header>
+
+<main id="app">
+  <section class="panel inputs">
+    <h2>입력</h2>
+    <label>모델 <select id="model"></select></label>
+    <div class="model-note" id="modelNote"></div>
+
+    <label>양자화
+      <select id="quant">
+        <option value="fp16">FP16 (2 bytes/param)</option>
+        <option value="int8">INT8 (1 byte)</option>
+        <option value="int4">INT4 / AWQ·GPTQ (0.5 byte)</option>
+      </select>
+    </label>
+
+    <label>하드웨어 <select id="gpu"></select></label>
+
+    <label>컨텍스트 길이 <span class="lab" id="contextLabel"></span>
+      <input type="range" id="context" min="2048" max="131072" step="2048" value="8192">
+    </label>
+
+    <label>동시 요청 <span class="lab" id="concurrencyLabel"></span>
+      <input type="range" id="concurrency" min="1" max="128" step="1" value="16">
+    </label>
+
+    <label>GPU 렌트 단가 override ($/hr, 비우면 기본값)
+      <input type="text" id="rent" inputmode="decimal" placeholder="예: 2.5">
+    </label>
+
+    <label>비교 API 프리셋 <select id="apiPreset"></select></label>
+    <label>비교 API 단가 ($/1M tok)
+      <input type="text" id="api" inputmode="decimal" value="0.8">
+    </label>
+  </section>
+
+  <section class="panel results">
+    <h2>결과 <span id="fitBadge"></span></h2>
+
+    <div class="block">
+      <div class="block-title">VRAM</div>
+      <div class="vram-bar" id="vramBar"></div>
+      <div class="legend"><span class="dot w"></span>가중치 <span class="dot k"></span>KV캐시 <span class="dot o"></span>오버헤드 <span class="cap-legend"></span>장비 VRAM 한계</div>
+      <div class="nums" id="vramNums"></div>
+    </div>
+
+    <div class="block grid2">
+      <div><div class="block-title">추론 속도</div><div id="tokS"></div></div>
+      <div><div class="block-title">서빙 처리량</div><div id="throughput"></div></div>
+    </div>
+
+    <div class="block">
+      <div class="block-title">자체호스팅 vs API</div>
+      <div id="costBox"></div>
+    </div>
+  </section>
+</main>
+
+<section class="how">
+  <details>
+    <summary>계산 방식 (투명하게)</summary>
+    <ul>
+      <li><b>VRAM</b> = 가중치(<code>total_params × bytes/param</code>) + KV캐시(<code>2 × layers × kv_dim × 2B × 컨텍스트</code>, GQA 반영) + 오버헤드(<code>1.2GB + 5%</code>).</li>
+      <li><b>추론 속도</b>(단일 스트림)는 디코딩이 메모리 대역폭에 묶인다는 근사: <code>MBU(0.5) × 대역폭 ÷ (활성 파라미터 × bytes)</code>. MoE는 활성 파라미터만 세므로 빠릅니다.</li>
+      <li><b>서빙 처리량</b> = 단일속도 × 유효배치 × 0.7. 유효배치는 남은 VRAM으로 감당 가능한 동시 시퀀스 수로 상한.</li>
+      <li><b>손익분기</b>: 자체호스팅 $/1M = <code>(렌트/시간 ÷ 3600) ÷ 처리량 × 1e6</code>. 이 값이 API 단가보다 낮으면(=GPU를 충분히 채우면) 자체호스팅이 쌉니다.</li>
+    </ul>
+    <p class="dim">모두 <b>근사 추정</b>입니다. 실제 수치는 커널·프레임워크·페이징·양자화 방식에 따라 달라집니다. 의사결정 전 실측 벤치를 권장합니다.</p>
+  </details>
+</section>
+
+<footer>
+  <p>100% 클라이언트 사이드 · <a href="https://github.com/sylvanus4/llm-selfhost-calculator">GitHub</a> · MIT · 특정 벤더와 무관한 독립 도구. 수치는 공개 정보 기반 추정치입니다.</p>
+</footer>
+
+<script src="assets/compute.js"></script>
+<script src="assets/app.js"></script>
+</body>
+</html>
