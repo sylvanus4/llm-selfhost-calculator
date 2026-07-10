@@ -1,0 +1,36 @@
+{
+  "_note": "Reference only — these are NOT token-priced like the LLMs above, so they are shown separately and not fed into the self-host-vs-API calculator. Self-host VRAM figures are fp16 weights-only estimates (params × 2 bytes); real inference needs more (activations, batching, streaming buffers). API prices are official list prices as of 2026-07 and change often; [추정] marks a derived/unconfirmed figure.",
+  "_updated": "2026-07-10",
+  "image": [
+    {"name": "gpt-image-2", "provider": "OpenAI", "price": "$30", "unit": "/1M img-out tok", "note": "토큰 단위 · 텍스트 입력 $5 / 이미지 입력 $8 (표준). 이미지당 단가는 OpenAI 계산기 참고"},
+    {"name": "gpt-image-1-mini", "provider": "OpenAI", "price": "$8", "unit": "/1M img-out tok", "note": "저가형 · 이미지 입력 $2.50 / 텍스트 입력 $2"},
+    {"name": "grok-imagine-image", "provider": "xAI", "price": "$0.02", "unit": "/이미지", "note": "1K/2K 출력 · 입력 $0.002/img"}
+  ],
+  "selfhost": [
+    {"name": "Whisper large-v3", "kind": "STT", "hf": "openai/whisper-large-v3", "params": "1.55B", "license": "MIT", "vram": "~3.1GB", "note": "인코더-디코더 · 100+ 언어 · 정확도 기준선"},
+    {"name": "Whisper large-v3-turbo", "kind": "STT", "hf": "openai/whisper-large-v3-turbo", "params": "809M", "license": "MIT", "vram": "~1.6GB", "note": "디코더 프루닝 · 훨씬 빠름"},
+    {"name": "Parakeet TDT 0.6B v3", "kind": "STT", "hf": "nvidia/parakeet-tdt-0.6b-v3", "params": "600M", "license": "CC-BY-4.0", "vram": "~1.2GB", "note": "FastConformer · 다국어(EU) · 타임스탬프"},
+    {"name": "Canary-1B v2", "kind": "STT", "hf": "nvidia/canary-1b-v2", "params": "978M", "license": "CC-BY-4.0", "vram": "~2GB", "note": "25개 EU 언어 · ASR+번역"},
+    {"name": "Qwen3-ASR-1.7B", "kind": "STT", "hf": "Qwen/Qwen3-ASR-1.7B", "params": "1.7B", "license": "Apache-2.0", "vram": "~3.4GB", "note": "52개 언어 · 스트리밍+오프라인 통합"},
+    {"name": "Moonshine base", "kind": "STT", "hf": "UsefulSensors/moonshine-base", "params": "61M", "license": "MIT", "vram": "~0.2GB", "note": "엣지용 초경량 · 영어"},
+    {"name": "VoxCPM2", "kind": "TTS", "hf": "openbmb/VoxCPM2", "params": "2B", "license": "Apache-2.0", "vram": "~4GB", "note": "토크나이저-프리 확산 · 30개 언어 · 48kHz · 클로닝"},
+    {"name": "Qwen3-TTS", "kind": "TTS", "hf": "Qwen/Qwen3-TTS-12Hz-1.7B-Base", "params": "1.7B", "license": "Apache-2.0", "vram": "~3.4GB", "note": "3초 클로닝 · 보이스 디자인 · 10개 언어"},
+    {"name": "Kokoro-82M", "kind": "TTS", "hf": "hexgrad/Kokoro-82M", "params": "82M", "license": "Apache-2.0", "vram": "~0.2GB", "note": "초경량·초고속 · 엣지 인기"},
+    {"name": "Chatterbox", "kind": "TTS", "hf": "ResembleAI/chatterbox", "params": "500M", "license": "MIT", "vram": "~1GB", "note": "23+ 언어 · 제로샷 클로닝 · 감정 조절"},
+    {"name": "Orpheus 3B", "kind": "TTS", "hf": "canopylabs/orpheus-3b-0.1-ft", "params": "3B", "license": "Apache-2.0", "vram": "~6GB", "note": "Llama 기반 speech-LLM · ~200ms 스트리밍"},
+    {"name": "F5-TTS", "kind": "TTS", "hf": "SWivid/F5-TTS", "params": "~335M", "license": "CC-BY-NC-4.0", "vram": "~0.7GB", "note": "플로우매칭 DiT · 제로샷 클로닝 · 비상업 라이선스"}
+  ],
+  "api": [
+    {"name": "gpt-4o-transcribe", "kind": "STT", "provider": "OpenAI", "price": "$2.50 / $10", "unit": "/1M 오디오 tok", "note": "입력/출력"},
+    {"name": "whisper-1", "kind": "STT", "provider": "OpenAI", "price": "$0.006", "unit": "/분", "note": ""},
+    {"name": "Deepgram Nova-3", "kind": "STT", "provider": "Deepgram", "price": "$0.0077", "unit": "/분", "note": "스트리밍"},
+    {"name": "AssemblyAI Universal-2", "kind": "STT", "provider": "AssemblyAI", "price": "$0.15", "unit": "/시간", "note": ""},
+    {"name": "ElevenLabs Scribe", "kind": "STT", "provider": "ElevenLabs", "price": "$0.22", "unit": "/시간", "note": ""},
+    {"name": "Google STT Standard", "kind": "STT", "provider": "Google", "price": "$0.016", "unit": "/분", "note": ""},
+    {"name": "gpt-4o-mini-tts", "kind": "TTS", "provider": "OpenAI", "price": "$0.60 / $12", "unit": "/1M tok", "note": "텍스트 입력 / 오디오 출력"},
+    {"name": "ElevenLabs Flash", "kind": "TTS", "provider": "ElevenLabs", "price": "$50", "unit": "/1M자", "note": ""},
+    {"name": "ElevenLabs Multilingual v3", "kind": "TTS", "provider": "ElevenLabs", "price": "$100", "unit": "/1M자", "note": ""},
+    {"name": "Grok Voice (xAI)", "kind": "TTS", "provider": "xAI", "price": "$15", "unit": "/1M자", "note": "STT $0.10/시간 · S2S $0.05/분"},
+    {"name": "Cartesia Sonic", "kind": "TTS", "provider": "Cartesia", "price": "~$0.038", "unit": "/분", "note": "크레딧 기반 환산 [추정]"}
+  ]
+}

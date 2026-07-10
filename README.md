@@ -19,9 +19,11 @@
 - **추론 속도** — 단일 스트림 디코딩 tok/s(메모리 대역폭 기반, 멀티 GPU면 합산 대역폭)와 배치 서빙 총 처리량.
 - **자체호스팅 vs API 손익분기** — GPU 렌트비(필요 대수 반영)와 처리량으로 자체호스팅 $/1M 토큰을 구해 API 단가와 비교, "API를 이기려면 필요한 처리량"까지.
 
-**최신 인기 모델을 최신순으로 내장** — GLM-5.2, Kimi K2.7, DeepSeek-V4(Pro/Flash), Qwen3.6(27B·35B-A3B), MiniMax-M2.7, Gemma 4(31B·26B-A4B·12B·E4B), Qwen3-8B. 스펙(layers/hidden/kv_dim/context)은 각 모델 HF `config.json`에서 확인했습니다. 가속기 12종(H200/H100/A100/L40S/4090/3090/L4 + Apple M-시리즈) 내장. 값은 UI에서 덮어쓸 수 있습니다.
+**최신 인기 모델 18종을 최신순으로 내장** — GLM-5.2, Kimi K2.7, **NVIDIA Nemotron 3(Ultra·Super·Nano)**, DeepSeek-V4(Pro/Flash), Qwen3.6(27B·35B-A3B), MiniMax-M2.7, Gemma 4(31B·26B-A4B·12B·E4B), **Mistral Devstral Small 2 24B**, **IBM Granite 4.0 H Small**, **OpenAI gpt-oss-120b**, Qwen3-8B. 스펙(layers/hidden/kv_dim/context)은 각 모델 HF `config.json`에서 확인했습니다. 가속기 12종(H200/H100/A100/L40S/4090/3090/L4 + Apple M-시리즈) 내장. 값은 UI에서 덮어쓸 수 있습니다.
 
-> MLA(Kimi·DeepSeek)는 압축 KV 캐시를, GLM-5.2는 희소 어텐션(DSA)을 씁니다. KV 추정은 이를 반영한 보수적 근사이며 실제와 다를 수 있습니다.
+**비교 API 단가도 최신 실제 가격으로 갱신** — Claude(Opus 4.8·Sonnet 5·Haiku 4.5·Fable 5), GPT-5.5·5.6, Grok 4.5·4.3의 입력/출력 단가와 blended $/1M을 내장(공개 리스트가, 2026-07 기준). blended = `(3×입력 + 출력) / 4`(입력 3:1 가중, RAG/에이전틱 사용 기준). 하단에 **이미지 생성(gpt-image-2 등)·음성 STT/TTS 참고 패널**을 추가 — 자체호스팅 음성 모델(Whisper·Qwen3-ASR·Parakeet·Canary / VoxCPM2·Qwen3-TTS·Kokoro·Chatterbox·Orpheus·F5-TTS)과 음성 API 가격(OpenAI·ElevenLabs·Deepgram·AssemblyAI·xAI 등)을 정리했습니다. 이들은 토큰 단위가 아니라 토큰 계산기와 1:1 비교되지 않으므로 별도 참고용입니다.
+
+> MLA(Kimi·DeepSeek)는 압축 KV 캐시를, GLM-5.2는 희소 어텐션(DSA)을, Nemotron 3·Granite 4·gpt-oss는 하이브리드 Mamba/슬라이딩윈도우를 씁니다. 하이브리드 Mamba 모델은 어텐션 층에만 KV가 붙으므로 `n_layers`를 어텐션 층 수로 잡아 반영했고, 나머지는 보수적 상한 근사입니다.
 
 ## 계산 방식 (투명하게) · How the math works
 

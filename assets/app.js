@@ -2,17 +2,19 @@
    Pure estimation core lives in compute.js (LLMCalc.compute), shared with the Node unit tests. */
 
 const compute = LLMCalc.compute;
-const state = { models: [], gpus: [], apiPresets: [] };
+const state = { models: [], gpus: [], apiPresets: [], speech: null };
 
 async function loadData() {
-  const [m, g, a] = await Promise.all([
+  const [m, g, a, s] = await Promise.all([
     fetch("data/models.json").then(r => r.json()),
     fetch("data/gpus.json").then(r => r.json()),
     fetch("data/api-prices.json").then(r => r.json()),
+    fetch("data/speech.json").then(r => r.json()),
   ]);
   state.models = m.models;
   state.gpus = g.gpus;
   state.apiPresets = a.presets;
+  state.speech = s;
 }
 
 function fmt(x, d = 1) { return x == null || isNaN(x) ? "—" : Number(x).toLocaleString("en-US", { maximumFractionDigits: d }); }
@@ -88,6 +90,33 @@ function el(id) { return document.getElementById(id); }
 
 function opt(v, t) { const o = document.createElement("option"); o.value = v; o.textContent = t; return o; }
 
+function esc(s) { return String(s == null ? "" : s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c])); }
+
+// Read-only reference tables (image gen + STT/TTS) — not fed into the token calculator, different pricing units.
+function renderReference() {
+  const s = state.speech;
+  if (!s) return;
+  const row = (nameHtml, meta, price, unit) =>
+    `<div class="ref-row"><div class="ref-name">${nameHtml}` +
+    (meta ? `<span class="ref-meta">${esc(meta)}</span>` : "") + `</div>` +
+    `<div class="ref-price">${esc(price)}${unit ? ` <span class="ref-unit">${esc(unit)}</span>` : ""}</div></div>`;
+
+  el("refImage").innerHTML = (s.image || []).map(x =>
+    row(`${esc(x.name)}<span class="ref-tag">${esc(x.provider || "")}</span>`, x.note, x.price, x.unit)).join("");
+
+  el("refSpeechSelf").innerHTML = (s.selfhost || []).map(x => {
+    const name = x.hf
+      ? `<a href="https://huggingface.co/${esc(x.hf)}" target="_blank" rel="noopener">${esc(x.name)}</a>`
+      : esc(x.name);
+    return row(`${name}<span class="ref-tag">${esc(x.kind)}</span>`,
+      [x.params, x.license, x.note].filter(Boolean).join(" · "), x.vram, "");
+  }).join("");
+
+  el("refSpeechApi").innerHTML = (s.api || []).map(x =>
+    row(`${esc(x.name)}<span class="ref-tag">${esc(x.kind)}</span>`,
+      [x.provider, x.note].filter(Boolean).join(" · "), x.price, x.unit)).join("");
+}
+
 async function init() {
   try {
     await loadData();
@@ -101,7 +130,12 @@ async function init() {
     el("model").appendChild(opt(m.id, `${m.name} · ${tag} · ${m.released}`));
   });
   state.gpus.forEach(g => el("gpu").appendChild(opt(g.id, g.name)));
-  state.apiPresets.forEach((p, i) => el("apiPreset").appendChild(opt(i, `${p.label} — $${p.usd_per_1m}/1M`)));
+  state.apiPresets.forEach((p, i) => {
+    const io = (p.input != null && p.output != null) ? ` (in $${p.input} / out $${p.output})` : "";
+    const prov = p.provider ? `${p.provider} ` : "";
+    el("apiPreset").appendChild(opt(i, `${prov}${p.label} — blended $${p.usd_per_1m}/1M${io}`));
+  });
+  renderReference();
 
   el("model").value = "qwen3.6-27b";
   el("gpu").value = "h100-80";
