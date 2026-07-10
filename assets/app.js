@@ -67,7 +67,8 @@ function render() {
 
   const cost = el("costBox");
   if (r.rent == null) {
-    cost.innerHTML = `<div class="dim">소유 기기(Apple)입니다 — 시간당 렌트가 없으므로 API 손익분기 대신 전기요금과 비교하세요. 위 tok/s와 적합성만 참고하세요.${N > 1 ? ` 이 모델은 이 기기 ${N}대가 필요합니다.` : ""}</div>`;
+    const ownedKind = gpu.kind === "apple" ? "소유 기기(Apple)" : gpu.kind === "npu" ? "온프렘 NPU" : "소유/온프렘 기기";
+    cost.innerHTML = `<div class="dim">${ownedKind}입니다 — 시간당 렌트가 없으므로 API 손익분기 대신 전기요금과 비교하세요. 위 tok/s와 적합성만 참고하세요.${N > 1 ? ` 이 모델은 이 기기 ${N}대가 필요합니다.` : ""}</div>`;
   } else {
     const cheaper = r.verdict === "self";
     const fleet = N > 1 ? ` (${N}× $${fmt(r.rent, 2)} = $${fmt(r.fleetRentHr, 2)}/hr)` : ` ($${fmt(r.rent, 2)}/hr)`;
