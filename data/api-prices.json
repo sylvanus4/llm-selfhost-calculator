@@ -1,11 +1,18 @@
 {
-  "_note": "Representative hosted API prices for comparable open models, USD per 1M tokens (blended input+output, order-of-magnitude). Real prices vary by provider and change often — override with your own quote in the UI.",
+  "_note": "Representative hosted text-LLM API prices, USD per 1M tokens. 'input'/'output' are official list prices (short-context tier); 'usd_per_1m' is a blended figure = (3×input + output) / 4, weighting input ~3:1 for typical RAG/agentic usage — it's the single number fed into the calculator's self-host-vs-API comparison. Real cost depends on your input:output mix; override with your own quote in the UI. Open-hosted rows are order-of-magnitude estimates (provider/quantization vary). Standard list prices as of 2026-07; closed-model prices change often.",
   "_updated": "2026-07-10",
   "presets": [
-    {"label": "Hosted 8B-class (e.g. Llama 3.1 8B)", "usd_per_1m": 0.18},
-    {"label": "Hosted 70B-class (e.g. Llama 3.3 70B)", "usd_per_1m": 0.80},
-    {"label": "Hosted 72B-class (e.g. Qwen2.5 72B)", "usd_per_1m": 1.20},
-    {"label": "Hosted MoE mid (e.g. Mixtral 8x7B)", "usd_per_1m": 0.55},
-    {"label": "Frontier closed API (GPT-4o class)", "usd_per_1m": 6.00}
+    {"label": "Hosted 8B-class (e.g. Llama/Qwen 8B)", "provider": "Open (hosted)", "usd_per_1m": 0.18},
+    {"label": "Hosted 30–70B-class (e.g. Qwen3.6-27B / Llama 70B)", "provider": "Open (hosted)", "usd_per_1m": 0.80},
+    {"label": "Hosted open MoE frontier (DeepSeek-V4 / Kimi급)", "provider": "Open (hosted)", "usd_per_1m": 0.55},
+    {"label": "Claude Haiku 4.5", "provider": "Anthropic", "input": 1.00, "output": 5.00, "usd_per_1m": 2.00},
+    {"label": "Claude Sonnet 5", "provider": "Anthropic", "input": 3.00, "output": 15.00, "usd_per_1m": 6.00},
+    {"label": "Claude Opus 4.8", "provider": "Anthropic", "input": 5.00, "output": 25.00, "usd_per_1m": 10.00},
+    {"label": "Claude Fable 5", "provider": "Anthropic", "input": 10.00, "output": 50.00, "usd_per_1m": 20.00},
+    {"label": "GPT-5.6 luna (mini)", "provider": "OpenAI", "input": 1.00, "output": 6.00, "usd_per_1m": 2.25},
+    {"label": "GPT-5.6", "provider": "OpenAI", "input": 5.00, "output": 30.00, "usd_per_1m": 11.25},
+    {"label": "GPT-5.5", "provider": "OpenAI", "input": 5.00, "output": 30.00, "usd_per_1m": 11.25},
+    {"label": "Grok 4.5", "provider": "xAI", "input": 2.00, "output": 6.00, "usd_per_1m": 3.00},
+    {"label": "Grok 4.3", "provider": "xAI", "input": 1.25, "output": 2.50, "usd_per_1m": 1.56}
   ]
 }
