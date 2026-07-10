@@ -13,6 +13,10 @@ jobs:
           node-version: "20"
       - name: Unit test estimation core
         run: node test/compute.test.cjs
+      - name: Independent formula + cost audit (anchors + JS parity)
+        run: |
+          node audit/js_compute_dump.cjs > /tmp/js.json
+          python3 audit/reference_audit.py /tmp/js.json
       - name: Validate JSON data
         run: |
           for f in data/*.json; do node -e "JSON.parse(require('fs').readFileSync('$f'))" && echo "ok $f"; done
