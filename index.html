@@ -41,9 +41,30 @@
       <input type="range" id="concurrency" min="1" max="128" step="1" value="16">
     </label>
 
-    <label>GPU 렌트 단가 override ($/hr, 비우면 기본값)
-      <input type="text" id="rent" inputmode="decimal" placeholder="예: 2.5">
+    <label>원가 모드
+      <div class="segmented" id="costMode">
+        <label><input type="radio" name="costmode" value="rent" checked> 임대 (클라우드 $/hr)</label>
+        <label><input type="radio" name="costmode" value="own"> 구매 (온프렘 회수)</label>
+      </div>
     </label>
+
+    <div id="rentGroup">
+      <label>GPU 렌트 단가 override ($/hr, 비우면 기본값)
+        <input type="text" id="rent" inputmode="decimal" placeholder="예: 2.5">
+      </label>
+    </div>
+
+    <div id="ownInputs" hidden>
+      <label>전기 단가 ($/kWh) <span class="hint">KR 산업용 ≈ ₩150 ≈ $0.11</span>
+        <input type="text" id="kwh" inputmode="decimal" value="0.12">
+      </label>
+      <label>월 예상 토큰량 <span class="lab" id="mtokLabel"></span>
+        <input type="range" id="monthlyTokens" min="0.1" max="200" step="0.1" value="5">
+      </label>
+      <label>구매가 override ($/장비, 비우면 데이터 기본값)
+        <input type="text" id="capex" inputmode="decimal" placeholder="예: 28000">
+      </label>
+    </div>
 
     <label>비교 API 프리셋 <select id="apiPreset"></select></label>
     <label>비교 API 단가 ($/1M tok)
@@ -99,7 +120,8 @@
       <li><b>VRAM</b> = 가중치(<code>total_params × bytes/param</code>) + KV캐시(<code>2 × layers × kv_dim × 2B × 컨텍스트</code>, GQA 반영) + 오버헤드(<code>1.2GB + 5%</code>).</li>
       <li><b>추론 속도</b>(단일 스트림)는 디코딩이 메모리 대역폭에 묶인다는 근사: <code>MBU(0.5) × 대역폭 ÷ (활성 파라미터 × bytes)</code>. MoE는 활성 파라미터만 세므로 빠릅니다.</li>
       <li><b>서빙 처리량</b> = 단일속도 × 유효배치 × 0.7. 유효배치는 남은 VRAM으로 감당 가능한 동시 시퀀스 수로 상한.</li>
-      <li><b>손익분기</b>: 자체호스팅 $/1M = <code>(렌트/시간 ÷ 3600) ÷ 처리량 × 1e6</code>. 이 값이 API 단가보다 낮으면(=GPU를 충분히 채우면) 자체호스팅이 쌉니다.</li>
+      <li><b>손익분기 (임대)</b>: 자체호스팅 $/1M = <code>(렌트/시간 ÷ 3600) ÷ 처리량 × 1e6</code>. 이 값이 API 단가보다 낮으면(=GPU를 충분히 채우면) 자체호스팅이 쌉니다.</li>
+      <li><b>회수 개월 (구매/온프렘)</b>: 장비를 <b>사는</b> 경우 — <code>capex = 구매가 × 필요 GPU수</code>, 월 전기료 = <code>전력(kW) × 월 토큰 생성에 쓴 GPU-시간 × $/kWh</code>, <code>회수개월 = capex ÷ (월 API비용 − 월 전기료)</code>. 전기료는 <b>토큰 생성에 실제 쓴 시간</b>만 계산하며 <b>idle 전력은 제외</b>합니다(실제 24/7 전용 박스는 더 듭니다). 월 순절감이 0 이하면 이 토큰량에선 회수되지 않습니다.</li>
     </ul>
     <p class="dim">모두 <b>근사 추정</b>입니다. 실제 수치는 커널·프레임워크·페이징·양자화 방식에 따라 달라집니다. 의사결정 전 실측 벤치를 권장합니다.</p>
   </details>
