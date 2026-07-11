@@ -66,5 +66,35 @@ for (const m of models) {
 ok("all models finite on H200", allFinite);
 ok("gpusNeeded >= 1 for all", allGpu);
 
+// 9. Owned/on-prem purchase payback mode (8th arg). null own -> unchanged; else capex/elec/payback math.
+const baseNoOwn = compute(M("qwen3.6-27b"), G("h100-80"), "int4", 8192, 16, null, 0.8);
+ok("own=null -> ownAvailable false", baseNoOwn.ownAvailable === false);
+ok("own=null -> paybackMonths null", baseNoOwn.paybackMonths === null);
+ok("own=null -> rental fields intact", baseNoOwn.selfHostPer1m > 0 && baseNoOwn.verdict != null);
+
+const own1 = compute(M("qwen3.6-27b"), G("h100-80"), "int4", 8192, 16, null, 6.0, { pricePerKwh: 0.12, monthlyTokens: 5e9, capexOverride: null });
+ok("own -> ownAvailable true (priced GPU)", own1.ownAvailable === true);
+ok("capexFleet = price * gpusNeeded", near(own1.capexFleet, G("h100-80").price_usd * own1.gpusNeeded, 0.001));
+ok("fleetKw = power * gpusNeeded / 1000", near(own1.fleetKw, G("h100-80").power_w * own1.gpusNeeded / 1000, 1e-6));
+ok("apiMonthly = tokens/1e6 * apiPer1m", near(own1.apiMonthly, (5e9 / 1e6) * 6.0, 0.001));
+ok("dear API + cheap power -> finite positive payback", own1.paybackMonths != null && own1.paybackMonths > 0 && Number.isFinite(own1.paybackMonths));
+ok("tcoSeries crossover brackets paybackMonths", (() => {
+  let cross = null;
+  for (const p of own1.tcoSeries) if (p.selfhost <= p.api) { cross = p.month; break; }
+  return cross != null && Math.abs(cross - own1.paybackMonths) <= 1.0;
+})());
+
+// capex override respected
+const own2 = compute(M("qwen3.6-27b"), G("h100-80"), "int4", 8192, 16, null, 6.0, { pricePerKwh: 0.12, monthlyTokens: 5e9, capexOverride: 1000 });
+ok("capexOverride respected", near(own2.capexFleet, 1000 * own2.gpusNeeded, 0.001));
+
+// cheap API + pricey power -> electricity >= savings -> never breaks even (null)
+const own3 = compute(M("qwen3.6-27b"), G("h100-80"), "int4", 8192, 16, null, 0.001, { pricePerKwh: 0.50, monthlyTokens: 1e8 });
+ok("elec >= api -> paybackMonths null (never)", own3.ownAvailable === true && own3.monthlyNetSaving <= 0 && own3.paybackMonths === null);
+
+// cloud-only device (trainium2, price_usd null) -> ownAvailable false
+const own4 = compute(M("qwen3-8b"), G("trainium2"), "int4", 8192, 16, null, 6.0, { pricePerKwh: 0.12, monthlyTokens: 5e9 });
+ok("cloud-only (no price) -> ownAvailable false", own4.ownAvailable === false);
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail === 0 ? 0 : 1);

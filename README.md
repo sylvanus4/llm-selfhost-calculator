@@ -17,9 +17,10 @@
 
 - **VRAM 적합성 + 필요 GPU 수** — 가중치 + KV 캐시(컨텍스트 반영) + 오버헤드를 장비 VRAM과 비교. 한 장에 들어가면 ✅, 넘치면 **몇 장이 필요한지(텐서 병렬)** 를 계산. Kimi K2.7(1T)·DeepSeek-V4(1.6T) 같은 초거대 MoE도 다룹니다.
 - **추론 속도** — 단일 스트림 디코딩 tok/s(메모리 대역폭 기반, 멀티 GPU면 합산 대역폭)와 배치 서빙 총 처리량.
-- **자체호스팅 vs API 손익분기** — GPU 렌트비(필요 대수 반영)와 처리량으로 자체호스팅 $/1M 토큰을 구해 API 단가와 비교, "API를 이기려면 필요한 처리량"까지.
+- **자체호스팅 vs API 손익분기 (임대 모드)** — GPU 렌트비(필요 대수 반영)와 처리량으로 자체호스팅 $/1M 토큰을 구해 API 단가와 비교, "API를 이기려면 필요한 처리량"까지.
+- **구매 회수 개월수 (구매/온프렘 모드)** — 장비를 **사는** 경우를 위한 손익분기. 구매가(capex) + 전력 단가 + 월 예상 토큰량을 넣으면 `회수개월 = capex ÷ (월 API비용 − 월 전기료)`로 **몇 달이면 본전을 뽑는지**와 누적비용 교차 곡선을 보여줍니다. 전기료는 토큰 생성에 실제 쓴 GPU-시간만 계산(active-energy, idle 제외)하며, 월 토큰량이 처리량 상한을 넘으면 경고합니다. 각 장비의 구매가·전력은 공개 근사이고 UI에서 덮어쓸 수 있습니다.
 
-**최신 인기 모델 18종을 최신순으로 내장** — GLM-5.2, Kimi K2.7, **NVIDIA Nemotron 3(Ultra·Super·Nano)**, DeepSeek-V4(Pro/Flash), Qwen3.6(27B·35B-A3B), MiniMax-M2.7, Gemma 4(31B·26B-A4B·12B·E4B), **Mistral Devstral Small 2 24B**, **IBM Granite 4.0 H Small**, **OpenAI gpt-oss-120b**, Qwen3-8B. 스펙(layers/hidden/kv_dim/context)은 각 모델 HF `config.json`에서 확인했습니다. 가속기 25종 내장 — NVIDIA Blackwell(GB300·GB200·B300·B200·RTX PRO 6000·DGX Spark), Hopper/Ampere(H200·H100·A100·L40S·A6000·4090·3090·L4), **AMD Instinct(MI355X·MI325X·MI300X)**, Apple M-시리즈, 그리고 **추론 NPU(FuriosaAI RNGD·Rebellions Rebel100·Intel Gaudi 3·AWS Trainium2, 최신 HBM 탑재)**. 소유/온프렘 기기(Apple·DGX Spark·NPU)는 렌트가 없어 전기요금 비교로 안내합니다. 값은 UI에서 덮어쓸 수 있습니다.
+**최신 인기 모델 18종을 최신순으로 내장** — GLM-5.2, Kimi K2.7, **NVIDIA Nemotron 3(Ultra·Super·Nano)**, DeepSeek-V4(Pro/Flash), Qwen3.6(27B·35B-A3B), MiniMax-M2.7, Gemma 4(31B·26B-A4B·12B·E4B), **Mistral Devstral Small 2 24B**, **IBM Granite 4.0 H Small**, **OpenAI gpt-oss-120b**, Qwen3-8B. 스펙(layers/hidden/kv_dim/context)은 각 모델 HF `config.json`에서 확인했습니다. 가속기 25종 내장 — NVIDIA Blackwell(GB300·GB200·B300·B200·RTX PRO 6000·DGX Spark), Hopper/Ampere(H200·H100·A100·L40S·A6000·4090·3090·L4), **AMD Instinct(MI355X·MI325X·MI300X)**, Apple M-시리즈, 그리고 **추론 NPU(FuriosaAI RNGD·Rebellions Rebel100·Intel Gaudi 3·AWS Trainium2, 최신 HBM 탑재)**. 소유/온프렘 기기(Apple·DGX Spark·NPU)는 렌트가 없으므로 **구매 모드**로 전환하면 구매가·전력으로 회수 개월수를 계산합니다(구매가 미공개 장비는 override 입력). 값은 UI에서 덮어쓸 수 있습니다.
 
 **양자화 6종 + 기법 가이드** — FP16/BF16 · FP8 · INT8 · **NVFP4**(Blackwell FP4, 4.5bit) · **MXFP4**(OCP microscaling, gpt-oss 기본) · INT4를 선택해 VRAM·tok/s를 즉시 비교. 4-bit 포맷의 **블록 스케일 오버헤드**(NVFP4는 FP8 per-16 스케일 → 정확히 0.5가 아닌 0.5625 byte)까지 반영합니다. 하단 "양자화 기법 가이드"에서 GPTQ·AWQ·SmoothQuant·GGUF k-quants·QuaRot 등 PTQ 방법과 하드웨어 요구(FP4 텐서코어 등)를 설명합니다.
 
@@ -54,7 +55,7 @@ python3 -m http.server 8000    # file:// 는 fetch가 막히므로 반드시 서
 추정 코어는 브라우저와 동일한 `assets/compute.js`를 그대로 Node에서 단위 테스트합니다.
 
 ```bash
-node test/compute.test.cjs      # 가중치 수식·적합성·MoE 속도·손익분기 등 12개 속성 검증
+node test/compute.test.cjs      # 가중치 수식·적합성·MoE 속도·임대 손익분기·구매 회수 등 속성 검증
 ```
 
 CI(`.github/workflows/validate.yml`)가 매 푸시마다 이 테스트 + JSON/HTML 파싱을 검증합니다.

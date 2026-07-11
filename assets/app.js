@@ -19,6 +19,47 @@ async function loadData() {
 
 function fmt(x, d = 1) { return x == null || isNaN(x) ? "—" : Number(x).toLocaleString("en-US", { maximumFractionDigits: d }); }
 
+// Owned/on-prem purchase payback rendering (capex + electricity → months to break even vs API).
+function renderOwnCost(cost, r, N) {
+  if (!r.ownAvailable) {
+    const msg = isNaN(parseFloat(el("kwh").value))
+      ? "전기 단가($/kWh)를 입력하면 회수 개월수를 계산합니다."
+      : `이 기기는 공개 구매가 또는 전력값이 없습니다 — 왼쪽에서 <b>구매가 override</b>를 입력하면 회수 개월수를 계산합니다.${N > 1 ? ` (이 모델은 ${N}대 필요)` : ""}`;
+    cost.innerHTML = `<div class="dim">${msg}</div>`;
+    return;
+  }
+  const fleet = N > 1 ? ` (${N}×)` : "";
+  const pb = r.paybackMonths, recovers = pb != null;
+  cost.innerHTML =
+    `<div class="cost-row"><span>장비 capex${fleet}</span><b>$${fmt(r.capexFleet, 0)}</b></div>` +
+    `<div class="cost-row"><span>월 전기료 <span class="dim">(active ${fmt(r.activeHours, 0)} GPU-h · ${fmt(r.fleetKw, 2)}kW)</span></span><b>$${fmt(r.elecMonthly, 2)}</b></div>` +
+    `<div class="cost-row"><span>월 API 비용 (대체분)</span><b>$${fmt(r.apiMonthly, 2)}</b></div>` +
+    `<div class="cost-row dim"><span>월 순절감 (API − 전기)</span><b>$${fmt(r.monthlyNetSaving, 2)}</b></div>` +
+    (r.overSubscribed ? `<div class="cost-row" style="border:0"><span style="color:var(--k)">⚠️ 이 처리량으론 월 ${fmt(r.activeHours, 0)} GPU-h(&gt;730h/월)가 필요 — 실제론 이 볼륨을 다 못 뽑습니다. GPU를 늘리거나 월 토큰량을 낮추세요.</span></div>` : "") +
+    `<div class="verdict ${recovers ? "self" : "api"}">${recovers
+      ? `이 토큰량이면 약 <b>${fmt(pb, 1)}개월</b>에 구매비를 회수합니다${pb > 60 ? ` — 다만 <b>5년+</b>라 감가·고장 전에 못 뽑을 수 있습니다` : ""}. GPU를 이만큼 꾸준히 돌린다는 가정입니다.`
+      : `이 토큰량에서는 <b>전기료 ≥ 대체 API 비용</b>이라 자체호스팅이 되레 비싸 <b>회수되지 않습니다</b>. 월 토큰량을 늘리거나 더 싼 전기/장비가 필요합니다.`}</div>` +
+    (recovers ? ownChartSVG(r.tcoSeries, pb) : "");
+}
+
+// Cumulative-cost crossover: self-host (capex + electricity) vs API, over the 36-month series.
+function ownChartSVG(series, pb) {
+  const W = 300, H = 90, pad = 5;
+  const last = series[series.length - 1], maxX = series.length - 1;
+  const maxY = Math.max(last.selfhost, last.api) || 1;
+  const px = m => pad + (m / maxX) * (W - 2 * pad);
+  const py = v => H - pad - (v / maxY) * (H - 2 * pad);
+  const line = (key, color) => `<polyline fill="none" stroke="${color}" stroke-width="2" points="${series.map(p => `${fmt(px(p.month), 1)},${fmt(py(p[key]), 1)}`).join(" ")}"/>`;
+  const inWindow = pb <= maxX;                                 // only draw the crossover marker if it actually falls inside the 36-month plot
+  const crossMark = inWindow ? `<line x1="${fmt(px(pb), 1)}" y1="${pad}" x2="${fmt(px(pb), 1)}" y2="${H - pad}" stroke="var(--dim)" stroke-width="1" stroke-dasharray="3 3"/>` : "";
+  return `<svg viewBox="0 0 ${W} ${H}" width="100%" height="${H}" style="margin-top:12px" role="img" aria-label="누적 비용 곡선">` +
+    crossMark + line("api", "var(--k)") + line("selfhost", "var(--ok)") + `</svg>` +
+    `<div class="dim" style="display:flex;gap:12px;flex-wrap:wrap;margin-top:2px">` +
+    `<span><span class="dot" style="background:var(--ok)"></span>구매 누적 (capex+전기)</span>` +
+    `<span><span class="dot" style="background:var(--k)"></span>API 누적</span>` +
+    `<span>${inWindow ? `┊ ${fmt(pb, 1)}개월 교차` : `${fmt(pb, 1)}개월 (36개월 창 밖)`}</span></div>`;
+}
+
 function render() {
   const model = state.models.find(m => m.id === el("model").value);
   const gpu = state.gpus.find(g => g.id === el("gpu").value);
@@ -29,10 +70,22 @@ function render() {
   const rentOverride = rentRaw === "" ? null : parseFloat(rentRaw);
   const apiPer1m = parseFloat(el("api").value);
 
+  const mode = document.querySelector('input[name="costmode"]:checked').value;
+  const monthlyTokensB = parseFloat(el("monthlyTokens").value);            // billions/month
+  const capexRaw = el("capex").value.trim();
+  const own = mode === "own" ? {
+    pricePerKwh: parseFloat(el("kwh").value),
+    monthlyTokens: monthlyTokensB * 1e9,
+    capexOverride: capexRaw === "" ? null : parseFloat(capexRaw),
+  } : null;
+
+  el("rentGroup").hidden = mode === "own";
+  el("ownInputs").hidden = mode !== "own";
   el("contextLabel").textContent = context.toLocaleString() + " tok";
   el("concurrencyLabel").textContent = concurrency + " concurrent";
+  el("mtokLabel").textContent = fmt(monthlyTokensB) + "B tok/월";
 
-  const r = compute(model, gpu, quant, context, concurrency, rentOverride, apiPer1m);
+  const r = compute(model, gpu, quant, context, concurrency, rentOverride, apiPer1m, own);
   const N = r.gpusNeeded;
 
   // model meta chips
@@ -66,7 +119,9 @@ function render() {
   el("throughput").innerHTML = `<b>${fmt(r.servingTokS)}</b> tok/s <span class="dim">서빙 총량 (배치 ${r.effBatch}, VRAM 헤드룸 최대 ${r.maxBatch})</span>`;
 
   const cost = el("costBox");
-  if (r.rent == null) {
+  if (mode === "own") {
+    renderOwnCost(cost, r, N);
+  } else if (r.rent == null) {
     const ownedKind = gpu.kind === "apple" ? "소유 기기(Apple)" : gpu.kind === "npu" ? "온프렘 NPU" : "소유/온프렘 기기";
     cost.innerHTML = `<div class="dim">${ownedKind}입니다 — 시간당 렌트가 없으므로 API 손익분기 대신 전기요금과 비교하세요. 위 tok/s와 적합성만 참고하세요.${N > 1 ? ` 이 모델은 이 기기 ${N}대가 필요합니다.` : ""}</div>`;
   } else {
@@ -149,8 +204,9 @@ async function init() {
     if (p) el("api").value = p.usd_per_1m;
     render();
   });
-  ["model", "gpu", "quant", "context", "concurrency", "rent", "api"].forEach(id =>
+  ["model", "gpu", "quant", "context", "concurrency", "rent", "api", "kwh", "monthlyTokens", "capex"].forEach(id =>
     el(id).addEventListener("input", render));
+  document.querySelectorAll('input[name="costmode"]').forEach(radio => radio.addEventListener("change", render));
   render();
 }
 
