@@ -39,6 +39,20 @@ const shortV = compute(M("qwen3.6-27b"), G("h100-80"), "fp16", 4096, 1, null, 1)
 const longV = compute(M("qwen3.6-27b"), G("h100-80"), "fp16", 262144, 1, null, 1).vramSingle;
 ok("longer context -> more VRAM", longV > shortV);
 
+// 4b. maxCtxTokens: longest batch=1 context that fits, capped at the model's trained max
+const fitCase = compute(M("qwen3.6-27b"), G("h100-80"), "int4", 8192, 1, null, 1);
+ok("fits @8k -> maxCtxTokens >= selected context", fitCase.fits && fitCase.maxCtxTokens >= 8192);
+ok("maxCtxTokens never exceeds model trained context", fitCase.maxCtxTokens <= M("qwen3.6-27b").context);
+const bigVram = compute(M("qwen3-8b"), G("h200"), "int4", 8192, 1, null, 1).maxCtxTokens;
+const smallVram = compute(M("qwen3-8b"), G("h100-80"), "int4", 8192, 1, null, 1).maxCtxTokens;
+ok("more VRAM -> >= max context (monotonic)", bigVram >= smallVram);
+let ctxFiniteNonneg = true;
+for (const m of models) {
+  const x = compute(m, G("h200"), "int4", 8192, 1, null, 1).maxCtxTokens;
+  if (!Number.isFinite(x) || x < 0 || x > m.context) ctxFiniteNonneg = false;
+}
+ok("maxCtxTokens finite, 0..trained-max for all models", ctxFiniteNonneg);
+
 // 5. MoE decodes faster than a same-quant dense model (active params win)
 const flash = compute(M("deepseek-v4-flash"), G("h100-80"), "int4", 8192, 1, null, 1).singleTokS;
 const dense27 = compute(M("qwen3.6-27b"), G("h100-80"), "int4", 8192, 1, null, 1).singleTokS;

@@ -112,7 +112,11 @@ function render() {
   el("vramNums").innerHTML =
     `가중치 <b>${fmt(r.weightsGB)}GB</b> + KV <b>${fmt(r.kvSingleGB)}GB</b> (@${context.toLocaleString()} tok) ` +
     `+ 오버헤드 <b>${fmt(r.overheadGB)}GB</b> = <b>${fmt(r.vramSingle)}GB</b>` +
-    (N > 1 ? ` → <b>${N}×</b> ${gpu.vram_gb}GB (총 ${fmt(r.totalVram)}GB)` : ` / ${gpu.vram_gb}GB`);
+    (N > 1 ? ` → <b>${N}×</b> ${gpu.vram_gb}GB (총 ${fmt(r.totalVram)}GB)` : ` / ${gpu.vram_gb}GB`) +
+    (r.maxCtxTokens > 0
+      ? `<div class="dim" style="margin-top:4px">이 구성 배치=1 최대 컨텍스트 <b>${r.maxCtxTokens.toLocaleString()} tok</b>` +
+        `${r.maxCtxTokens >= model.context ? " (모델 최대치까지 여유)" : " (더 길면 VRAM 초과)"}</div>`
+      : `<div class="dim warn" style="margin-top:4px">가중치가 이미 VRAM을 초과 — 컨텍스트 0</div>`);
 
   const nNote = N > 1 ? ` · ${N} GPU 합산 대역폭` : "";
   el("tokS").innerHTML = `<b>${fmt(r.singleTokS)}</b> tok/s <span class="dim">단일 스트림${nNote}</span>`;

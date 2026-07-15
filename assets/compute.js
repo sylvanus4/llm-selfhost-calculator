@@ -32,6 +32,9 @@
 
     const freeForKV = totalVram - weightsGB - overheadGB;
     const maxBatch = freeForKV > 0 ? Math.floor(freeForKV / kvSingleGB) : 0;
+    // Longest single-sequence context (batch=1) that fits on this device count, capped at the
+    // model's trained max. Answers the consumer question "what's the longest prompt+gen I can run?".
+    const maxCtxTokens = kvPerTokenGB > 0 ? Math.min(model.context, Math.max(0, Math.floor(freeForKV / kvPerTokenGB))) : 0;
 
     const singleTokS = (MBU * aggBandwidth) / activeGB;           // decode is bandwidth-bound on ACTIVE weights
     const effBatch = Math.max(1, Math.min(concurrency, maxBatch || 1));
@@ -70,7 +73,7 @@
     }
 
     return { bpp, weightsGB, activeGB, kvPerTokenGB, overheadGB, kvSingleGB, vramSingle, fits,
-      gpusNeeded, totalVram, aggBandwidth, freeForKV, maxBatch, singleTokS, effBatch, servingTokS,
+      gpusNeeded, totalVram, aggBandwidth, freeForKV, maxBatch, maxCtxTokens, singleTokS, effBatch, servingTokS,
       rent, fleetRentHr, selfHostPer1m, requiredTokS, verdict,
       ownAvailable, capexFleet, fleetKw, activeHours, elecMonthly, apiMonthly, monthlyNetSaving, paybackMonths, tcoSeries, overSubscribed };
   }
