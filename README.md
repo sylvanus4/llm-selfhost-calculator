@@ -20,6 +20,17 @@
 - **자체호스팅 vs API 손익분기 (임대 모드)** — GPU 렌트비(필요 대수 반영)와 처리량으로 자체호스팅 $/1M 토큰을 구해 API 단가와 비교, "API를 이기려면 필요한 처리량"까지.
 - **구매 회수 개월수 (구매/온프렘 모드)** — 장비를 **사는** 경우를 위한 손익분기. 구매가(capex) + 전력 단가 + 월 예상 토큰량을 넣으면 `회수개월 = capex ÷ (월 API비용 − 월 전기료)`로 **몇 달이면 본전을 뽑는지**와 누적비용 교차 곡선을 보여줍니다. 전기료는 토큰 생성에 실제 쓴 GPU-시간만 계산(active-energy, idle 제외)하며, 월 토큰량이 처리량 상한을 넘으면 경고합니다. 각 장비의 구매가·전력은 공개 근사이고 UI에서 덮어쓸 수 있습니다.
 
+## vLLM 서빙 준비도 · vLLM Ready Check
+
+두 번째 탭 **"vLLM 서빙 준비도"** 는 "이 모델, vLLM에서 바로 서빙되나?"에 답하고 **바로 쓰는 배포 매니페스트**를 생성합니다.
+
+- **3-tier 판정** — ①**네이티브 지원**(전용 커널, 플래그 불필요) ②**Transformers 백엔드**(네이티브 목록엔 없지만 표준 아키텍처 → `--model-impl transformers`로 near-native) ③**커스텀 코드/판정 불가**(`--trust-remote-code` 필요, 실측 권장). vLLM의 Transformers 백엔드가 네이티브 속도에 도달했다는 점을 반영합니다.
+- **입력 3-경로** — 큐레이션 드롭다운(오프라인 즉시) · **HF 모델 URL 붙여넣기**(`huggingface.co/Org/Model`을 파싱해 ID 추출) · bare ID. 붙여넣은 것이 큐레이션 셋에 있으면 외부 요청 없이 오프라인 판정을 씁니다. 없으면 명시적 버튼을 눌렀을 때만 HF `config.json`을 fetch(무전송 원칙 보존).
+- **매니페스트 생성** — 계산기의 입력(양자화·GPU·컨텍스트·동시요청)과 VRAM 산정에서 `--tensor-parallel-size`·`--max-model-len`·`--gpu-memory-utilization`·`--quantization` 등을 도출해 **docker-compose · Kubernetes(Deployment+Service, `/health` readiness) · Helm values** 를 즉시 생성·복사·다운로드합니다.
+- **기준 버전 핀** — 판정 근거는 `data/vllm-support.json`(vLLM `0.25.1` 핀, 릴리스마다 갱신)의 네이티브 아키텍처 목록입니다. 매칭되면 高신뢰, 미매칭이라고 미지원은 아닙니다.
+
+> ⚠️ 계산기의 양자화 선택은 VRAM "what-if"입니다. `--quantization` 플래그는 해당 양자화 **체크포인트가 실제 존재할 때만** 유효합니다(vLLM은 디스크 위 실제 가중치 포맷과 맞아야 함). 임의 HF 모델은 파라미터 수 미상이라 TP는 1을 기본으로 두고 매니페스트에서 직접 조정합니다.
+
 **최신 인기 모델 18종을 최신순으로 내장** — GLM-5.2, Kimi K2.7, **NVIDIA Nemotron 3(Ultra·Super·Nano)**, DeepSeek-V4(Pro/Flash), Qwen3.6(27B·35B-A3B), MiniMax-M2.7, Gemma 4(31B·26B-A4B·12B·E4B), **Mistral Devstral Small 2 24B**, **IBM Granite 4.0 H Small**, **OpenAI gpt-oss-120b**, Qwen3-8B. 스펙(layers/hidden/kv_dim/context)은 각 모델 HF `config.json`에서 확인했습니다. 가속기 25종 내장 — NVIDIA Blackwell(GB300·GB200·B300·B200·RTX PRO 6000·DGX Spark), Hopper/Ampere(H200·H100·A100·L40S·A6000·4090·3090·L4), **AMD Instinct(MI355X·MI325X·MI300X)**, Apple M-시리즈, 그리고 **추론 NPU(FuriosaAI RNGD·Rebellions Rebel100·Intel Gaudi 3·AWS Trainium2, 최신 HBM 탑재)**. 소유/온프렘 기기(Apple·DGX Spark·NPU)는 렌트가 없으므로 **구매 모드**로 전환하면 구매가·전력으로 회수 개월수를 계산합니다(구매가 미공개 장비는 override 입력). 값은 UI에서 덮어쓸 수 있습니다.
 
 **양자화 6종 + 기법 가이드** — FP16/BF16 · FP8 · INT8 · **NVFP4**(Blackwell FP4, 4.5bit) · **MXFP4**(OCP microscaling, gpt-oss 기본) · INT4를 선택해 VRAM·tok/s를 즉시 비교. 4-bit 포맷의 **블록 스케일 오버헤드**(NVFP4는 FP8 per-16 스케일 → 정확히 0.5가 아닌 0.5625 byte)까지 반영합니다. 하단 "양자화 기법 가이드"에서 GPTQ·AWQ·SmoothQuant·GGUF k-quants·QuaRot 등 PTQ 방법과 하드웨어 요구(FP4 텐서코어 등)를 설명합니다.

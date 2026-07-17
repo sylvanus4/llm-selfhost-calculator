@@ -2,19 +2,25 @@
    Pure estimation core lives in compute.js (LLMCalc.compute), shared with the Node unit tests. */
 
 const compute = LLMCalc.compute;
-const state = { models: [], gpus: [], apiPresets: [], speech: null };
+const state = { models: [], gpus: [], apiPresets: [], speech: null, vllm: null };
+
+// vLLM tab state: fetched = {id, config} for an arbitrary HF model (null = use curated dropdown);
+// manifests/spec cached from last render; active = which manifest tab is shown.
+const vllmState = { fetched: null, spec: null, manifests: null, active: "compose" };
 
 async function loadData() {
-  const [m, g, a, s] = await Promise.all([
+  const [m, g, a, s, v] = await Promise.all([
     fetch("data/models.json").then(r => r.json()),
     fetch("data/gpus.json").then(r => r.json()),
     fetch("data/api-prices.json").then(r => r.json()),
     fetch("data/speech.json").then(r => r.json()),
+    fetch("data/vllm-support.json").then(r => r.json()),
   ]);
   state.models = m.models;
   state.gpus = g.gpus;
   state.apiPresets = a.presets;
   state.speech = s;
+  state.vllm = v;
 }
 
 function fmt(x, d = 1) { return x == null || isNaN(x) ? "—" : Number(x).toLocaleString("en-US", { maximumFractionDigits: d }); }
@@ -144,6 +150,133 @@ function render() {
   const kvNote = model.note ? ` · <span class="warn">${model.note}</span>` : "";
   el("modelNote").innerHTML = `<a href="https://huggingface.co/${model.hf}" target="_blank" rel="noopener">${model.hf}</a>${moeNote}${kvNote}`;
   if (context > model.context) el("modelNote").innerHTML += ` <span class="warn">⚠️ 선택 컨텍스트가 모델 최대(${model.context.toLocaleString()})를 초과</span>`;
+
+  renderVllm(r);
+}
+
+// ---- vLLM serving-readiness tab -------------------------------------------
+
+const TIER_BADGE = { native: "ok", transformers: "multi", custom: "warn", unknown: "no", unsupported: "no" };
+
+function renderVllm(r) {
+  const support = state.vllm;
+  if (!support) return;
+  const quant = el("quant").value;
+  const context = parseInt(el("context").value, 10);
+  const concurrency = parseInt(el("concurrency").value, 10);
+
+  let verdictInput, modelId, modelMaxContext, gpuCount, custom = false, quantMethod = null, vramNote = "";
+  if (vllmState.fetched) {
+    const cfg = vllmState.fetched.config;
+    verdictInput = { config: cfg, id: vllmState.fetched.id };
+    modelId = vllmState.fetched.id;
+    modelMaxContext = cfg.max_position_embeddings || context;
+    gpuCount = 1;
+    custom = !!(cfg.auto_map || cfg.trust_remote_code);
+    quantMethod = (cfg.quantization_config && (cfg.quantization_config.quant_method || cfg.quantization_config.quant_algo)) || null;
+    vramNote = "임의 HF 모델 — 파라미터 수 미상이라 VRAM 자동산정/TP 계산은 생략합니다(TP=1 기본, 매니페스트에서 직접 조정).";
+  } else {
+    const model = state.models.find(m => m.id === el("model").value);
+    verdictInput = { curated: model };
+    modelId = model.hf;
+    modelMaxContext = model.context;
+    gpuCount = r.gpusNeeded;
+  }
+
+  const verdict = LLMCalc.vllmVerdict(verdictInput, support);
+  const spec = LLMCalc.buildServingSpec({
+    modelId, quant, context, modelMaxContext, concurrency, gpuCount,
+    vllmVersion: support.vllm_version, custom,
+    implTransformers: verdict.tier === "transformers", quantMethod,
+  });
+  vllmState.spec = spec;
+  vllmState.manifests = {
+    compose: Manifest.dockerCompose(spec),
+    k8s: Manifest.k8sManifest(spec),
+    helm: Manifest.helmValues(spec),
+  };
+
+  el("vllmBadge").innerHTML = `<span class="badge ${TIER_BADGE[verdict.tier] || "no"}">${verdict.ok ? "✅" : "⚠️"} ${esc(verdict.label)}</span>`;
+
+  const help = (support.tier_help && support.tier_help[verdict.tier]) || "";
+  const caveats = (verdict.caveats || []).length
+    ? `<ul class="caveats">${verdict.caveats.map(c => `<li>${esc(c)}</li>`).join("")}</ul>` : "";
+  el("vllmVerdictBox").innerHTML =
+    `<div><b>모델</b> <a href="https://huggingface.co/${esc(modelId)}" target="_blank" rel="noopener">${esc(modelId)}</a></div>` +
+    (verdict.arch ? `<div class="dim"><b>아키텍처</b> <code>${esc(verdict.arch)}</code></div>` : "") +
+    `<div class="dim"><b>기준 vLLM</b> v${esc(support.vllm_version)}${verdict.min_vllm && verdict.min_vllm !== support.vllm_version ? ` · 최소 v${esc(verdict.min_vllm)}` : ""}</div>` +
+    (help ? `<div class="verdict ${verdict.ok ? "self" : "api"}">${esc(help)}</div>` : "") +
+    caveats +
+    (vramNote ? `<div class="dim warn" style="margin-top:6px">${esc(vramNote)}</div>` : "");
+
+  const cli = "vllm serve " + spec.args.join(" ").replace(/ --/g, " \\\n  --");
+  const quantWhatIf = (quant !== "fp16" && !vllmState.fetched)
+    ? `<div class="dim warn" style="margin-top:6px">⚠️ <code>--quantization</code>은 해당 양자화 체크포인트가 실제 존재할 때만 유효합니다. 계산기의 양자화 선택은 VRAM "what-if"이며, vLLM은 디스크 위 실제 가중치 포맷과 맞아야 합니다.</div>`
+    : "";
+  el("vllmParams").innerHTML = `<pre class="code small"><code>${esc(cli)}</code></pre>${quantWhatIf}`;
+
+  renderManifest();
+}
+
+function renderManifest() {
+  if (!vllmState.manifests) return;
+  el("manifestCode").textContent = vllmState.manifests[vllmState.active] || "";
+}
+
+function switchResultTab(which) {
+  document.querySelectorAll("#resultTabs .tab").forEach(t => t.classList.toggle("active", t.dataset.panel === which));
+  el("panelCalc").hidden = which !== "calc";
+  el("panelVllm").hidden = which !== "vllm";
+}
+
+function normalizeAndRoute() {
+  const raw = el("hfRef").value;
+  const status = el("hfRefStatus");
+  const fetchBtn = el("hfFetchBtn");
+  if (!raw.trim()) { status.textContent = ""; fetchBtn.hidden = true; return; }
+  const ref = LLMCalc.normalizeHfRef(raw);
+  if (!ref) { status.innerHTML = `<span class="warn">URL/ID를 해석하지 못했습니다. 예: <code>Qwen/Qwen3-8B</code></span>`; fetchBtn.hidden = true; return; }
+  const curated = state.models.find(m => m.hf.toLowerCase() === ref.toLowerCase());
+  if (curated) {
+    status.innerHTML = `✅ 큐레이션 모델 <b>${esc(curated.name)}</b> — 오프라인 판정 사용(외부 요청 없음)`;
+    fetchBtn.hidden = true;
+    vllmState.fetched = null;
+    if (el("model").value !== curated.id) el("model").value = curated.id;
+    render();
+    switchResultTab("vllm");
+  } else {
+    status.innerHTML = `<b>${esc(ref)}</b> — 큐레이션 목록에 없음. 아래 버튼으로 HF에 <code>config.json</code>을 요청하면 vLLM 판정을 냅니다. <span class="warn">(외부 네트워크 요청)</span>`;
+    fetchBtn.hidden = false;
+    fetchBtn.dataset.ref = ref;
+  }
+}
+
+async function fetchHfConfig() {
+  const ref = el("hfFetchBtn").dataset.ref;
+  if (!ref) return;
+  const status = el("hfRefStatus");
+  status.innerHTML = `<span class="dim">config.json 불러오는 중…</span>`;
+  try {
+    const r = await fetch(`https://huggingface.co/${ref}/resolve/main/config.json`);
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    const cfg = await r.json();
+    vllmState.fetched = { id: ref, config: cfg };
+    status.innerHTML = `✅ <b>${esc(ref)}</b> config 불러옴 — 오른쪽 <b>vLLM 서빙 준비도</b> 탭 참고.`;
+    render();
+    switchResultTab("vllm");
+  } catch (e) {
+    vllmState.fetched = null;
+    status.innerHTML = `<span class="warn">불러오기 실패 (${esc(e.message)}). 게이트/비공개 모델·CORS·오프라인일 수 있습니다. 큐레이션 드롭다운을 사용하세요.</span>`;
+  }
+}
+
+function downloadText(filename, text) {
+  const blob = new Blob([text], { type: "text/plain;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url; a.download = filename;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
 function el(id) { return document.getElementById(id); }
@@ -188,6 +321,7 @@ async function init() {
   state.models.forEach(m => {
     const tag = m.moe ? `${fmt(m.total_params_b, 0)}B·A${fmt(m.active_params_b, 0)}B MoE` : `${fmt(m.total_params_b, 0)}B`;
     el("model").appendChild(opt(m.id, `${m.name} · ${tag} · ${m.released}`));
+    const d = document.createElement("option"); d.value = m.hf; d.label = m.name; el("hfList").appendChild(d);
   });
   state.gpus.forEach(g => el("gpu").appendChild(opt(g.id, g.name)));
   state.apiPresets.forEach((p, i) => {
@@ -208,9 +342,43 @@ async function init() {
     if (p) el("api").value = p.usd_per_1m;
     render();
   });
-  ["model", "gpu", "quant", "context", "concurrency", "rent", "api", "kwh", "monthlyTokens", "capex"].forEach(id =>
+  ["gpu", "quant", "context", "concurrency", "rent", "api", "kwh", "monthlyTokens", "capex"].forEach(id =>
     el(id).addEventListener("input", render));
   document.querySelectorAll('input[name="costmode"]').forEach(radio => radio.addEventListener("change", render));
+
+  // Selecting a curated model from the dropdown overrides any fetched HF model.
+  el("model").addEventListener("change", () => {
+    vllmState.fetched = null;
+    el("hfRef").value = ""; el("hfRefStatus").textContent = ""; el("hfFetchBtn").hidden = true;
+    render();
+  });
+
+  // Result tabs (비용 · 적합성 / vLLM 서빙 준비도)
+  document.querySelectorAll("#resultTabs .tab").forEach(t =>
+    t.addEventListener("click", () => switchResultTab(t.dataset.panel)));
+
+  // HF URL/ID input funnel + opt-in config fetch
+  el("hfRef").addEventListener("input", normalizeAndRoute);
+  el("hfFetchBtn").addEventListener("click", fetchHfConfig);
+
+  // Manifest sub-tabs + copy/download
+  document.querySelectorAll("#manifestTabs .tab").forEach(t =>
+    t.addEventListener("click", () => {
+      vllmState.active = t.dataset.mf;
+      document.querySelectorAll("#manifestTabs .tab").forEach(x => x.classList.toggle("active", x === t));
+      renderManifest();
+    }));
+  el("mfCopy").addEventListener("click", async () => {
+    const text = (vllmState.manifests || {})[vllmState.active] || "";
+    try { await navigator.clipboard.writeText(text); el("mfStatus").textContent = "복사됨"; }
+    catch (e) { el("mfStatus").textContent = "복사 실패 — 코드를 직접 선택하세요"; }
+    setTimeout(() => { el("mfStatus").textContent = ""; }, 2000);
+  });
+  el("mfDownload").addEventListener("click", () => {
+    const names = { compose: "docker-compose.yml", k8s: "vllm-deployment.yaml", helm: "values.yaml" };
+    downloadText(names[vllmState.active] || "manifest.txt", (vllmState.manifests || {})[vllmState.active] || "");
+  });
+
   render();
 }
 

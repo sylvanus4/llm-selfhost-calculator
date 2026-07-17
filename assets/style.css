@@ -67,6 +67,26 @@ input[type=range] { width: 100%; margin-top: 8px; accent-color: var(--accent); }
 .verdict.self { background: color-mix(in srgb, var(--ok) 12%, transparent); border: 1px solid color-mix(in srgb, var(--ok) 30%, transparent); }
 .verdict.api { background: color-mix(in srgb, var(--k) 12%, transparent); border: 1px solid color-mix(in srgb, var(--k) 30%, transparent); }
 
+/* ---- vLLM serving-readiness tab ---- */
+.badge.warn { color: var(--k); background: color-mix(in srgb, var(--k) 15%, transparent); }
+.tabs { display: flex; gap: 4px; margin-bottom: 14px; border-bottom: 1px solid var(--border); }
+.tabs.sub { border-bottom: 0; margin-bottom: 8px; }
+.tab { appearance: none; background: transparent; border: 0; border-bottom: 2px solid transparent; color: var(--dim);
+  font-family: var(--sans); font-size: 13px; font-weight: 600; padding: 8px 12px; min-height: 40px; cursor: pointer; }
+.tab:hover { color: var(--text); }
+.tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+.fetch-btn { appearance: none; background: var(--panel2); color: var(--text); border: 1px solid var(--border);
+  border-radius: 8px; font-family: var(--sans); font-size: 12.5px; padding: 8px 12px; min-height: 40px; cursor: pointer; }
+.fetch-btn:hover { border-color: var(--accent); }
+.mf-actions { display: flex; gap: 8px; align-items: center; margin-bottom: 8px; }
+.caveats { margin: 8px 0 0; padding-left: 18px; font-size: 12px; color: var(--dim); }
+.caveats li { margin: 2px 0; }
+pre.code { background: var(--panel2); border: 1px solid var(--border); border-radius: 8px; padding: 12px;
+  overflow-x: auto; margin: 0; }
+pre.code code { font-family: var(--mono); font-size: 12px; color: var(--text); white-space: pre; }
+pre.code.small code { font-size: 11.5px; }
+#vllmVerdictBox code, .dim code { font-family: var(--mono); font-size: 12px; color: var(--accent); }
+
 .how { max-width: 980px; margin: 8px auto; padding: 0 20px; }
 .how details { background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius); padding: 4px 18px; }
 .how summary { cursor: pointer; padding: 12px 0; font-weight: 600; }
