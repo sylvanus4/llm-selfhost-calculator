@@ -13,6 +13,21 @@ jobs:
           node-version: "20"
       - name: Unit test estimation core
         run: node test/compute.test.cjs
+      - name: Unit test vLLM serving-readiness core
+        run: node test/vllm.test.cjs
+      - name: Validate generated manifests are well-formed YAML
+        run: |
+          pip install --quiet pyyaml
+          node -e '
+            const fs=require("fs");
+            const {buildServingSpec}=require("./assets/compute.js");
+            const M=require("./assets/manifest.js");
+            const spec=buildServingSpec({modelId:"deepseek-ai/DeepSeek-V4-Pro",quant:"fp8",context:262144,modelMaxContext:1048576,concurrency:64,gpuCount:8,vllmVersion:"0.25.1"});
+            fs.writeFileSync("/tmp/dc.yml",M.dockerCompose(spec));
+            fs.writeFileSync("/tmp/k8s.yaml",M.k8sManifest(spec));
+            fs.writeFileSync("/tmp/helm.yaml",M.helmValues(spec));
+          '
+          python3 -c "import yaml; [list(yaml.safe_load_all(open(f))) for f in ['/tmp/dc.yml','/tmp/k8s.yaml','/tmp/helm.yaml']]; print('manifests parse as YAML')"
       - name: Independent formula + cost audit (anchors + JS parity)
         run: |
           node audit/js_compute_dump.cjs > /tmp/js.json
@@ -23,5 +38,7 @@ jobs:
       - name: Sanity-check HTML wiring
         run: |
           grep -q 'assets/compute.js' index.html
+          grep -q 'assets/manifest.js' index.html
           grep -q 'assets/app.js' index.html
+          grep -q 'id="panelVllm"' index.html
           echo "html wiring ok"
