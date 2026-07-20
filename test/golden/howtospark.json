@@ -1,0 +1,64 @@
+{
+  "_note": "Golden calibration set harvested from howtospark.com recipe pages + the BosonJoe demo video (2026-07-20). Each entry = a real worked example with MEASURED or howtospark-estimated per-node memory segments, used to calibrate compute.js bpp/usable/overhead constants and as regression anchors in test/spark.test.cjs. Source of truth for segment taxonomy: howtospark uses vLLM-Moet (Sapid-Labs/vLLM-Moet, branch spark-gb10) 2-bit expert kernels + NVFP4 dense. Segment order (per node, high addr -> low): os_reserve(outside usable) / free / activations+graphs(overhead) / kv / draft(spec only) / dense / expert_planes. gpu=dgx-spark: total 128 GiB unified, ~7 GiB OS reserve, usable ~114 GiB (video showed 110 for an older reserve figure; use per-gpu usable_gb field).",
+  "_bpp_anchors": {
+    "nvfp4_expert": {"bits": 4.5, "bytes_per_param": 0.5625, "detail": "E2M1 (4-bit) + FP8 scale per 16 weights = 4 + 8/16 = 4.5 bits", "source": "howtospark qwen3.6-35b recipe: 32.2B experts -> 17 GiB"},
+    "fp4_expert": {"bits": 4.0, "bytes_per_param": 0.5, "detail": "E2M1 dense FP4", "source": "deepseek-v4-flash recipe: 256x43 experts ~132 GiB /2 ranks"},
+    "twobit_expert": {"bits": 2.3, "bytes_per_param": 0.2875, "detail": "2-bit planes + scales, vLLM-Moet moe_w2 kernel", "source": "glm-5.2 recipe: pruned 208/256 -> 79 GB/rank"},
+    "fp8_dense": {"bits": 8.0, "bytes_per_param": 1.0},
+    "bf16": {"bits": 16.0, "bytes_per_param": 2.0}
+  },
+  "recipes": [
+    {
+      "id": "qwen3-6-35b-a3b-nvfp4-fast",
+      "model": "qwen3.6-35b-a3b", "gpu": "dgx-spark", "nodes": 1,
+      "quant": "expert_nvfp4", "context": 262144, "spec": "mtp_k3",
+      "usable_gib": 114, "used_gib": 36, "pct_usable": 32,
+      "tok_s": 106.5,
+      "segments": {
+        "os_reserve": 7, "free": 78, "activations": 10,
+        "kv": {"gib": 4, "prec": "FP8"},
+        "draft": {"gib": 1.6, "prec": "BF16"},
+        "dense": {"gib": 3.6, "prec": "FP8+BF16"},
+        "expert_planes": {"gib": 17, "prec": "NVFP4", "experts": 256, "layers": 40, "expert_params_b": 32.2, "bits": 4.5}
+      }
+    },
+    {
+      "id": "glm-5-2-dual-spark-tp2",
+      "model": "glm-5.2", "gpu": "dgx-spark", "nodes": 2, "tp": 2,
+      "quant": "expert_2bit", "context": 8192, "spec": "dspark_fast",
+      "reap_prune_pct": 18.75, "experts_kept": 208, "experts_total": 256,
+      "usable_gib": 114, "used_gib": 104, "pct_usable": 91,
+      "tok_s": 15, "tok_s_fast": 24.3,
+      "per_rank_segments": {
+        "os_reserve": 7, "free": 10, "activations": 6,
+        "kv": {"gib": 2, "prec": "FP8", "detail": "MLA KV @ 8K"},
+        "draft": {"gib": 5, "prec": "FP8"},
+        "dense": {"gib": 12, "prec": "FP8"},
+        "expert_planes": {"gib": 79, "prec": "2-bit", "detail": "pruned 256->208/layer REAP-style, ~95 GB full-pool"}
+      }
+    },
+    {
+      "id": "deepseek-v4-flash-dspark-dual-spark-1m",
+      "model": "deepseek-v4-flash", "gpu": "dgx-spark", "nodes": 2, "tp": 2,
+      "quant": "expert_fp4", "context": 1048576, "spec": "dspark",
+      "usable_gib": 114, "used_gib": 111, "pct_usable": 98,
+      "tok_s": 41.7,
+      "per_rank_segments": {
+        "os_reserve": 7, "free": 3, "activations": 16,
+        "kv": {"gib": 17.21, "prec": "NVFP4 (nvfp4_ds_mla)", "measured": true, "detail": "2,555,830-token pool, 2.44x concurrency at 1M"},
+        "draft": {"gib": 2, "prec": "FP8"},
+        "dense": {"gib": 10, "prec": "FP8"},
+        "expert_planes": {"gib": 66, "prec": "FP4", "experts": 256, "layers": 43, "detail": "~132 GiB /2 ranks"}
+      }
+    }
+  ],
+  "video_states": {
+    "_note": "BosonJoe demo (MiniMaxAI/MiniMax-M3, 427B/26B active, MoE 128x4). Values read off 3 frames; approximate (pixel-read).",
+    "model_display": {"total_b": 427, "active_b": 26, "experts": 128, "topk": 4, "ctx_max": 1048576},
+    "states": [
+      {"nodes": 3, "quant": "expert_nvfp4", "reap": 0, "context": 500000, "usable_per_node": 110, "per_node": {"free": 45, "kv": 20.5, "expert": 34.5, "used": 65, "pct": 59}, "total_gib": 195, "tok_s": 83.5, "ctx_fits": 1600000},
+      {"nodes": 2, "quant": "expert_nvfp4", "reap": 25, "context": 303000, "usable_per_node": 110, "per_node": {"free": 41, "kv": 18.6, "expert": 38.8, "used": 69, "pct": 62}, "total_gib": 137, "tok_s": 55.7, "ctx_fits": 976000},
+      {"nodes": 2, "quant": "int4", "reap": 20, "context": 197000, "usable_per_node": 110, "per_node": {"free": 4, "kv": 12.1, "expert": 82.8, "used": 106, "pct": 96}, "total_gib": 212, "tok_s": 41.4, "ctx_fits": 260000}
+    ]
+  }
+}

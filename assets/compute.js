@@ -214,8 +214,147 @@
     };
   }
 
+  // ---- Spark cluster / per-node memory layout (howtospark.com-style) --------
+  // Faithful port of the howtospark.com "on the Sparks" view: force a node count,
+  // pick a mixed-precision quant, optionally REAP-prune MoE experts, and see the
+  // per-node memory stack (expert planes / KV / dense / overhead / free) + fit + tok/s.
+  //
+  // Constants anchored to howtospark.com recipe pages + Sapid-Labs/vLLM-Moet kernels
+  // (spark-gb10, 2026-07); see test/golden/howtospark.json. All are PLANNING
+  // approximations, not vendor guarantees.
+  //   expert_bpp = bytes/param for MoE routed experts; dense_bpp = bytes/param for the
+  //   always-on backbone (attention, embeddings, router, shared expert, lm_head).
+  //   NVFP4 = E2M1(4b) + FP8 scale/16 = 4.5 bit = 0.5625 B (measured: Qwen3.6-35B 32.2B experts -> 17 GiB).
+  //   2-bit expert kernel ~2.1 bit = 0.26 B (GLM-5.2: full-pool ~95 GB/rank, pruned 208/256 -> ~79 GB/rank).
+  const SPARK_QUANT = [
+    { id: "bf16",     label: "native bfloat16",             expert_bpp: 2.0,    dense_bpp: 2.0,    quality: "exact" },
+    { id: "entropy",  label: "lossless entropy coding",     expert_bpp: 1.55,   dense_bpp: 1.55,   quality: "lossless" },
+    { id: "int8",     label: "8-bit",                       expert_bpp: 1.0,    dense_bpp: 1.0,    quality: "near-lossless" },
+    { id: "int4",     label: "4-bit",                       expert_bpp: 0.5,    dense_bpp: 0.5,    quality: "good" },
+    { id: "gguf1",    label: "1-bit GGUF (dynamic)",        expert_bpp: 0.20,   dense_bpp: 0.5,    quality: "experimental" },
+    { id: "e2_fp8",   label: "2-bit experts + FP8 dense",   expert_bpp: 0.26, dense_bpp: 1.0,    quality: "balanced" },
+    { id: "e2_nvfp4", label: "2-bit experts + NVFP4 dense", expert_bpp: 0.26, dense_bpp: 0.5625, quality: "balanced" },
+  ];
+  // Speculative-decode tok/s multipliers (upper-bound; real acceptance is model/workload-dependent).
+  // Anchored to vLLM-Moet MTP/dspark K=3 measurements (GLM-5.2: 15 -> 24.3 tok/s fast build ~=1.6x).
+  const SPEC_MULT = { off: 1.0, ngram: 1.2, draft: 1.4, eagle: 1.9, mtp: 1.6 };
+  const SPARK_TP_EFF = nc => (nc > 1 ? 0.8 : 1);          // tensor-parallel comm overhead
+  const REAP_MAX = 0.5;                                    // REAP supports up to ~50% expert prune (Cerebras 2510.13999)
+
+  // Usable memory of ONE device (bytes visible to the process). Unified-memory boxes
+  // (DGX Spark, Apple) reserve a chunk for OS/driver; HBM cards expose ~all VRAM.
+  function sparkUsableGB(gpu) {
+    if (gpu.usable_gb != null) return gpu.usable_gb;
+    const reserved = (gpu.kind === "apple") ? 0 : (gpu.id === "dgx-spark" ? 14 : 0);
+    return Math.max(1, gpu.vram_gb - reserved);            // dgx-spark 128 -> ~114
+  }
+
+  // Split a model into dense backbone vs routed-expert params (billions).
+  // Uses explicit dense_params_b when present (grounded), else a labeled estimate.
+  function sparkParts(model) {
+    const total = model.total_params_b;
+    if (!model.moe) return { denseB: total, expertB: 0, nExperts: 0, estimated: false };
+    let denseB = model.dense_params_b, estimated = false;
+    if (denseB == null) {                                   // estimate: backbone ~ min(half total, ~0.6x active)
+      denseB = Math.max(2, Math.min(total * 0.5, model.active_params_b * 0.6));
+      estimated = true;
+    }
+    return { denseB, expertB: Math.max(0, total - denseB), nExperts: model.n_experts || 0, estimated };
+  }
+
+  // REAP expert pruning: prune p (0..0.5) of routed experts. Shrinks expert MEMORY;
+  // active top-k count (and thus decode compute/tok-s) is unchanged.
+  function sparkReap(parts, prunePct) {
+    const keep = 1 - Math.max(0, Math.min(REAP_MAX, (prunePct || 0) / 100));
+    const kept = parts.nExperts ? Math.round(parts.nExperts * keep) : 0;
+    return { denseB: parts.denseB, expertB: parts.expertB * keep, keep, kept, nExperts: parts.nExperts, estimated: parts.estimated };
+  }
+
+  function sparkModeById(id) { return SPARK_QUANT.find(m => m.id === id) || SPARK_QUANT[SPARK_QUANT.length - 1]; }
+
+  // Weight footprint (GB) for a quant mode after pruning.
+  function sparkFootprint(reaped, mode) {
+    const expertGB = reaped.expertB * mode.expert_bpp;
+    const denseGB = reaped.denseB * mode.dense_bpp;
+    return { expertGB, denseGB, weightsGB: expertGB + denseGB };
+  }
+
+  // Single-stream tok/s: bandwidth-bound on ACTIVE weight bytes, scaled by node count.
+  function sparkTokS(model, gpu, nodeCount, mode, spec) {
+    const total = model.total_params_b, active = model.active_params_b;
+    const parts = sparkParts(model);
+    const denseActiveB = model.moe ? parts.denseB : total;                 // dense is always active
+    const expertActiveB = model.moe ? Math.max(0, active - parts.denseB) : 0; // active routed experts (top-k)
+    const activeBytesGB = denseActiveB * mode.dense_bpp + expertActiveB * mode.expert_bpp;
+    const aggBandwidth = gpu.bandwidth_gbs * nodeCount * SPARK_TP_EFF(nodeCount);
+    const base = activeBytesGB > 0 ? (MBU * aggBandwidth) / activeBytesGB : 0;
+    return base * (SPEC_MULT[spec] || 1);
+  }
+
+  // Per-node memory stack + cluster fit. context in tokens; spec = key of SPEC_MULT.
+  function sparkFit(model, gpu, nodeCount, modeId, prunePct, context, spec) {
+    const nodes = Math.max(1, Math.min(4, Math.floor(nodeCount || 1)));
+    const total = model.total_params_b;
+    const mode = sparkModeById(modeId);
+    const reaped = sparkReap(sparkParts(model), prunePct);
+    const fp = sparkFootprint(reaped, mode);
+    const usablePerNode = sparkUsableGB(gpu);
+    const usableTotal = usablePerNode * nodes;
+
+    // KV cache (FP16 upper bound), sharded across nodes with the weights (TP).
+    const kvPerTokenGB = (2 * model.n_layers * model.kv_dim * KV_BYTES) / 1e9;
+    const kvTotalGB = kvPerTokenGB * (context || 0);
+    // Draft model residency when spec-decode is on (small; MTP/EAGLE head or dspark drafter).
+    const draftTotalGB = (spec && spec !== "off") ? Math.min(6, 0.02 * total + 1) : 0;
+    // Activation/CUDA-graph/NCCL overhead, per node, grows slightly with weights.
+    const overheadPerNode = 1.2 + 0.05 * (fp.weightsGB / nodes);
+
+    const weightsPerNode = fp.weightsGB / nodes;
+    const expertPerNode = fp.expertGB / nodes;
+    const densePerNode = fp.denseGB / nodes;
+    const kvPerNode = kvTotalGB / nodes;
+    const draftPerNode = draftTotalGB / nodes;
+    const usedPerNode = weightsPerNode + kvPerNode + draftPerNode + overheadPerNode;
+    const freePerNode = usablePerNode - usedPerNode;
+
+    // Longest context that fits: free memory (after weights+overhead+draft) / KV-per-token, cluster-wide.
+    const freeForKV = usableTotal - fp.weightsGB - draftTotalGB - overheadPerNode * nodes;
+    const maxCtxFits = kvPerTokenGB > 0 ? Math.max(0, Math.floor(freeForKV / kvPerTokenGB)) : 0;
+
+    const tokS = sparkTokS(model, gpu, nodes, mode, spec);
+    const perNode = [];
+    for (let i = 0; i < nodes; i++) perNode.push({
+      role: i === 0 ? "HEAD" : "WORKER",
+      expertGB: expertPerNode, denseGB: densePerNode, weightsGB: weightsPerNode,
+      kvGB: kvPerNode, draftGB: draftPerNode, overheadGB: overheadPerNode,
+      freeGB: freePerNode, usedGB: usedPerNode, usableGB: usablePerNode,
+      pct: usablePerNode > 0 ? (usedPerNode / usablePerNode) * 100 : 0,
+    });
+
+    return {
+      nodes, mode, prunePct: Math.max(0, Math.min(REAP_MAX * 100, prunePct || 0)),
+      keep: reaped.keep, expertsKept: reaped.kept, nExperts: reaped.nExperts,
+      usablePerNode, usableTotal,
+      expertGB: fp.expertGB, denseGB: fp.denseGB, weightsGB: fp.weightsGB,
+      kvTotalGB, draftTotalGB, usedTotalGB: usedPerNode * nodes,
+      fits: usedPerNode <= usablePerNode, tokS, maxCtxFits,
+      estimated: reaped.estimated, perNode,
+    };
+  }
+
+  // Full quant ladder: every mode at the current node/prune/context/spec -> row list.
+  function sparkLadder(model, gpu, nodeCount, prunePct, context, spec) {
+    return SPARK_QUANT.map(m => {
+      const f = sparkFit(model, gpu, nodeCount, m.id, prunePct, context, spec);
+      return { id: m.id, label: m.label, quality: m.quality, weightsGB: f.weightsGB,
+        totalGB: f.usedTotalGB, tokS: f.tokS, fits: f.fits, usableTotal: f.usableTotal };
+    });
+  }
+
   const api = { compute, BYTES_PER_PARAM, KV_BYTES, MBU, BATCH_EFF,
-    normalizeHfRef, vllmVerdict, buildServingSpec, servedName, vllmQuantFlag, detectQuantMethod };
+    normalizeHfRef, vllmVerdict, buildServingSpec, servedName, vllmQuantFlag, detectQuantMethod,
+    SPARK_QUANT, SPEC_MULT, sparkUsableGB, sparkParts, sparkReap, sparkFootprint,
+    sparkTokS, sparkFit, sparkLadder };
   if (typeof module !== "undefined" && module.exports) module.exports = api;
   else root.LLMCalc = api;
 })(typeof self !== "undefined" ? self : this);

@@ -39,6 +39,18 @@
 
 > MLA(Kimi·DeepSeek)는 압축 KV 캐시를, GLM-5.2는 희소 어텐션(DSA)을, Nemotron 3·Granite 4·gpt-oss는 하이브리드 Mamba/슬라이딩윈도우를 씁니다. 하이브리드 Mamba 모델은 어텐션 층에만 KV가 붙으므로 `n_layers`를 어텐션 층 수로 잡아 반영했고, 나머지는 보수적 상한 근사입니다.
 
+## Spark 배치 · 노드별 메모리 (howtospark-style)
+
+세 번째 탭 **"Spark 배치"** 는 [howtospark.com](https://howtospark.com/)의 "on the Sparks" 뷰를 이식한 것으로, 큰 MoE 모델을 **여러 노드(GPU) 클러스터에 얹었을 때 노드마다 메모리가 어떻게 쌓이는지**를 보여줍니다.
+
+- **노드 수 강제 선택 (1×~4×)** — auto TP가 아니라 원하는 노드 수를 고정하고 fit 여부를 봅니다. 가중치·KV는 노드로 텐서-병렬 샤딩됩니다.
+- **양자화 사다리** — 모든 양자화(native bf16 · 무손실 엔트로피 · 8-bit · 4-bit · 1-bit GGUF · **2-bit experts + FP8/NVFP4 dense**)를 한 화면에서 막대(초록=usable 안, 빨강=초과)+총 GB+tok/s로 비교. mixed-precision은 MoE **expert planes를 저비트**, **dense backbone을 별도 정밀도**로 나눠 계산합니다.
+- **REAP 전문가 프루닝 (0~50%)** — MoE 라우팅 전문가를 프루닝해 메모리를 줄입니다([Cerebras REAP](https://arxiv.org/abs/2510.13999): 최대 50%에서 품질 ~97% 유지). 프루닝은 메모리만 줄이고 top-k 활성 수는 그대로라 tok/s는 불변입니다.
+- **추측 디코딩 (spec decode)** — off/n-gram/draft/EAGLE/MTP가 tok/s 배수로 반영됩니다(상한 근사).
+- **노드별 스택 카드** — 노드마다 Expert planes / Dense / KV cache / 오버헤드 / free를 세로로 쌓아 `used / usable · % of usable`을 표시. "이 구성 최대 컨텍스트" 리드아웃 포함.
+
+> 판정 근거(bpp·세그먼트)는 [howtospark.com](https://howtospark.com/) recipe 예제와 [Sapid-Labs/vLLM-Moet](https://github.com/Sapid-Labs/vLLM-Moet) 2-bit expert 커널에 앵커링했습니다: NVFP4 expert = E2M1(4b)+FP8 scale/16 = 4.5bit = 0.5625 B, 2-bit expert kernel ≈ 0.26 B, FP8 dense = 1 B. 골든 회귀 앵커는 `test/golden/howtospark.json`(GLM-5.2 2-bit 79 GB/rank pruned, DeepSeek-V4-Flash FP4 66 GB/rank 등)에 고정되어 `test/spark.test.cjs`가 CI에서 검증합니다. 모두 **계획용 근사**이며 실측 벤치를 권장합니다.
+
 ## 계산 방식 (투명하게) · How the math works
 
 | 항목 | 근사식 |

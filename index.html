@@ -83,6 +83,7 @@
     <div class="tabs" id="resultTabs">
       <button type="button" class="tab active" data-panel="calc">비용 · 적합성</button>
       <button type="button" class="tab" data-panel="vllm">vLLM 서빙 준비도</button>
+      <button type="button" class="tab" data-panel="spark">Spark 배치</button>
     </div>
     <div id="panelCalc">
     <h2>결과 <span id="fitBadge"></span></h2>
@@ -130,6 +131,73 @@
         <pre class="code"><code id="manifestCode"></code></pre>
       </div>
     </div><!-- /panelVllm -->
+
+    <div id="panelSpark" hidden>
+      <h2>Spark 배치 <span id="sparkBadge"></span></h2>
+      <div class="spark-model-head">
+        <div class="spark-model-name" id="sparkModelName"></div>
+        <div class="chips" id="sparkChips"></div>
+      </div>
+
+      <div class="block">
+        <div class="cluster-bar">
+          <div class="cluster-ctl">
+            <div class="block-title">노드 수 <span class="dim" id="sparkGpuName"></span></div>
+            <div class="segmented sparks" id="sparkNodes">
+              <label><input type="radio" name="sparknodes" value="1"> 1×</label>
+              <label><input type="radio" name="sparknodes" value="2" checked> 2×</label>
+              <label><input type="radio" name="sparknodes" value="3"> 3×</label>
+              <label><input type="radio" name="sparknodes" value="4"> 4×</label>
+            </div>
+          </div>
+          <div class="cluster-ctl">
+            <div class="block-title">REAP 전문가 프루닝 <span class="lab" id="sparkReapLabel"></span></div>
+            <input type="range" id="sparkReap" min="0" max="50" step="1" value="0">
+            <div class="dim" id="sparkReapNote"></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="block">
+        <div class="block-title">양자화 사다리 <span class="dim">— 막대 = usable 대비 · 초록 fit · 빨강 초과</span></div>
+        <div class="ladder" id="sparkLadder"></div>
+      </div>
+
+      <div class="block">
+        <div class="cluster-bar">
+          <div class="cluster-ctl">
+            <div class="block-title">추측 디코딩 (spec decode)</div>
+            <div class="segmented" id="sparkSpec">
+              <label><input type="radio" name="sparkspec" value="off" checked> off</label>
+              <label><input type="radio" name="sparkspec" value="ngram"> n-gram</label>
+              <label><input type="radio" name="sparkspec" value="draft"> draft</label>
+              <label><input type="radio" name="sparkspec" value="eagle"> EAGLE</label>
+              <label><input type="radio" name="sparkspec" value="mtp"> MTP</label>
+            </div>
+          </div>
+          <div class="cluster-ctl ctxfits">
+            <div class="block-title">컨텍스트</div>
+            <div id="sparkCtxFits" class="dim"></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="block">
+        <div class="block-title" id="sparkNodesTitle">노드별 메모리</div>
+        <div class="node-cards" id="sparkNodeCards"></div>
+        <div class="legend node-legend">
+          <span class="dot" style="background:var(--ok)"></span>Expert planes
+          <span class="dot" style="background:var(--accent)"></span>Dense
+          <span class="dot" style="background:var(--k)"></span>KV cache
+          <span class="dot" style="background:var(--o)"></span>오버헤드
+        </div>
+      </div>
+
+      <div class="spark-note dim">
+        모든 수치는 <b>계획용 근사</b>입니다 — bpp·세그먼트는 <a href="https://howtospark.com/" target="_blank" rel="noopener">howtospark.com</a> recipe와
+        <a href="https://github.com/Sapid-Labs/vLLM-Moet" target="_blank" rel="noopener">vLLM-Moet</a> 커널에 앵커링. REAP 프루닝: <a href="https://arxiv.org/abs/2510.13999" target="_blank" rel="noopener">Cerebras 2510.13999</a> (최대 50%). 실측 벤치 권장.
+      </div>
+    </div><!-- /panelSpark -->
   </section>
 </main>
 
