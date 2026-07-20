@@ -24,6 +24,7 @@ async function loadData() {
 }
 
 function fmt(x, d = 1) { return x == null || isNaN(x) ? "—" : Number(x).toLocaleString("en-US", { maximumFractionDigits: d }); }
+function ctxShort(t) { return t >= 1e6 ? (t / 1e6).toFixed(t % 1e6 ? 1 : 0) + "M" : Math.round(t / 1000) + "K"; }
 
 // Owned/on-prem purchase payback rendering (capex + electricity → months to break even vs API).
 function renderOwnCost(cost, r, N) {
@@ -152,6 +153,7 @@ function render() {
   if (context > model.context) el("modelNote").innerHTML += ` <span class="warn">⚠️ 선택 컨텍스트가 모델 최대(${model.context.toLocaleString()})를 초과</span>`;
 
   renderVllm(r);
+  renderSpark(model, gpu, context);
 }
 
 // ---- vLLM serving-readiness tab -------------------------------------------
@@ -223,10 +225,95 @@ function renderManifest() {
   el("manifestCode").textContent = vllmState.manifests[vllmState.active] || "";
 }
 
+// ---- Spark 배치 tab (howtospark.com-style per-node memory layout) ----------
+
+const sparkState = { nodes: 2, reap: 0, spec: "off", quant: "e2_nvfp4" };
+
+function sparkChipsHTML(model) {
+  const parts = LLMCalc.sparkParts(model);
+  const items = [
+    model.moe ? `${fmt(model.total_params_b, 0)}B total` : `${fmt(model.total_params_b, 0)}B dense`,
+    `A${fmt(model.active_params_b, 1)}B active`,
+    model.moe ? (model.n_experts ? `MoE ${model.n_experts} experts` : "MoE") : "dense",
+    `kv_dim ${model.kv_dim}`,
+    `ctx ${ctxShort(model.context)}`,
+    model.license,
+  ].filter(Boolean);
+  return items.map(t => `<span class="chip">${esc(t)}</span>`).join("") +
+    (parts.estimated ? `<span class="chip warn">dense [근사]</span>` : "");
+}
+
+function nodeCardHTML(n, i) {
+  const seg = (val, cls, label) => {
+    const h = Math.max(0, val / n.usableGB * 100);
+    if (h < 0.4) return "";
+    const lab = (label && h > 8) ? `<span class="seg-label">${esc(label)}<br>${fmt(val, 1)} GB</span>` : "";
+    return `<span class="ncard-seg ${cls}" style="height:${h}%">${lab}</span>`;
+  };
+  const overhead = n.overheadGB + n.draftGB;
+  const over = n.freeGB < 0;
+  return `<div class="ncard${over ? " over" : ""}">
+    <div class="ncard-head">spark${i + 1} <span class="ncard-role">${n.role}</span></div>
+    <div class="ncard-stack">
+      ${seg(Math.max(0, n.freeGB), "free", n.freeGB > 3 ? `${fmt(n.freeGB, 0)} GB free` : "")}
+      ${seg(overhead, "overhead", "")}
+      ${seg(n.kvGB, "kv", "KV cache")}
+      ${seg(n.denseGB, "dense", "Dense")}
+      ${seg(n.expertGB, "expert", "Expert planes")}
+    </div>
+    <div class="ncard-foot"><b class="${over ? "over" : ""}">${fmt(n.usedGB, 0)}</b> / ${fmt(n.usableGB, 0)} GB<br>
+      <span class="dim">${fmt(n.pct, 0)}% of usable</span></div>
+  </div>`;
+}
+
+function renderSpark(model, gpu, context) {
+  el("sparkModelName").innerHTML = `<a href="https://huggingface.co/${esc(model.hf)}" target="_blank" rel="noopener">${esc(model.name)}</a>`;
+  el("sparkChips").innerHTML = sparkChipsHTML(model);
+  el("sparkGpuName").textContent = "· " + gpu.name.split(" (")[0];
+
+  const kept = model.n_experts ? Math.round(model.n_experts * (1 - sparkState.reap / 100)) : 0;
+  el("sparkReapLabel").textContent = !model.moe ? "—"
+    : sparkState.reap === 0 ? "프루닝 없음 · " + model.n_experts + " experts"
+    : `${sparkState.reap}% · ${model.n_experts}→${kept}`;
+  el("sparkReapNote").innerHTML = !model.moe ? `<span class="warn">dense 모델 — REAP 해당 없음</span>`
+    : sparkState.reap > 30 ? `<span class="warn">⚠️ 30%↑ 프루닝은 품질 저하 가능 (Cerebras: 50%에서 ~97% 유지)</span>` : "";
+
+  // quant ladder
+  const rows = LLMCalc.sparkLadder(model, gpu, sparkState.nodes, sparkState.reap, context, sparkState.spec);
+  const usable = rows.length ? rows[0].usableTotal : 1;
+  const maxBar = Math.max(usable, ...rows.map(r => r.totalGB)) || 1;
+  el("sparkLadder").innerHTML = rows.map(r => {
+    const sel = r.id === sparkState.quant;
+    const totalPct = Math.min(100, r.totalGB / maxBar * 100);
+    const overPct = r.totalGB > usable ? Math.min(100, (r.totalGB - usable) / maxBar * 100) : 0;
+    const fitPct = Math.max(0, totalPct - overPct);
+    const usablePct = usable / maxBar * 100;
+    return `<button type="button" class="ladder-row${sel ? " sel" : ""}" data-q="${r.id}" aria-pressed="${sel}">
+      <span class="lr-label">${esc(r.label)}</span>
+      <span class="lr-bar"><span class="lr-fit" style="width:${fitPct}%"></span><span class="lr-over" style="width:${overPct}%"></span><span class="lr-usable" style="left:${usablePct}%"></span></span>
+      <span class="lr-gb ${r.fits ? "" : "over"}">${fmt(r.totalGB, 0)} GB</span>
+      <span class="lr-tok">${fmt(r.tokS, 1)} tok/s</span>
+    </button>`;
+  }).join("");
+
+  // selected quant -> node cards + badge + ctx-fits
+  const f = LLMCalc.sparkFit(model, gpu, sparkState.nodes, sparkState.quant, sparkState.reap, context, sparkState.spec);
+  const gpuShort = gpu.name.split(" (")[0];
+  el("sparkBadge").innerHTML = f.fits
+    ? `<span class="badge ok">✅ ${sparkState.nodes}× ${esc(gpuShort)}에 들어감</span>`
+    : `<span class="badge no">⚠️ ${sparkState.nodes}×에 안 들어감 — 노드↑ / 더 낮은 quant / REAP↑</span>`;
+  el("sparkNodesTitle").textContent = `노드별 메모리 — ${sparkState.nodes}× · ${f.mode.label} · ${ctxShort(context)} ctx`;
+  el("sparkCtxFits").innerHTML = f.maxCtxFits > 0
+    ? `이 구성 최대 컨텍스트 <b>~${(f.maxCtxFits / 1000).toFixed(0)}K tok</b> <span class="dim">(현재 ${ctxShort(context)})</span>`
+    : `<span class="warn">가중치가 usable 초과 — 컨텍스트 0</span>`;
+  el("sparkNodeCards").innerHTML = f.perNode.map((n, i) => nodeCardHTML(n, i)).join("");
+}
+
 function switchResultTab(which) {
   document.querySelectorAll("#resultTabs .tab").forEach(t => t.classList.toggle("active", t.dataset.panel === which));
   el("panelCalc").hidden = which !== "calc";
   el("panelVllm").hidden = which !== "vllm";
+  el("panelSpark").hidden = which !== "spark";
 }
 
 function normalizeAndRoute() {
@@ -353,9 +440,20 @@ async function init() {
     render();
   });
 
-  // Result tabs (비용 · 적합성 / vLLM 서빙 준비도)
+  // Result tabs (비용 · 적합성 / vLLM 서빙 준비도 / Spark 배치)
   document.querySelectorAll("#resultTabs .tab").forEach(t =>
     t.addEventListener("click", () => switchResultTab(t.dataset.panel)));
+
+  // Spark 배치 controls
+  document.querySelectorAll('input[name="sparknodes"]').forEach(radio =>
+    radio.addEventListener("change", () => { sparkState.nodes = parseInt(radio.value, 10); render(); }));
+  document.querySelectorAll('input[name="sparkspec"]').forEach(radio =>
+    radio.addEventListener("change", () => { sparkState.spec = radio.value; render(); }));
+  el("sparkReap").addEventListener("input", () => { sparkState.reap = parseInt(el("sparkReap").value, 10); render(); });
+  el("sparkLadder").addEventListener("click", (e) => {
+    const row = e.target.closest(".ladder-row");
+    if (row && row.dataset.q) { sparkState.quant = row.dataset.q; render(); }
+  });
 
   // HF URL/ID input funnel + opt-in config fetch
   el("hfRef").addEventListener("input", normalizeAndRoute);

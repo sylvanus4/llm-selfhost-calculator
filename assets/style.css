@@ -114,3 +114,58 @@ footer a { color: var(--accent); }
 .ref-price { font-size: 12px; font-family: var(--mono); color: var(--text); white-space: nowrap; text-align: right; }
 .ref-price .ref-unit { color: var(--dim); font-size: 10.5px; }
 .ref-tag { font-size: 9.5px; font-family: var(--mono); color: var(--dim); border: 1px solid var(--border); border-radius: 999px; padding: 0 5px; margin-left: 5px; vertical-align: middle; }
+
+/* ---- Spark 배치 tab (howtospark-style per-node memory) ---- */
+.spark-model-head { margin-bottom: 4px; }
+.spark-model-name { font-size: 15px; font-weight: 600; }
+.spark-model-name a { color: var(--accent); text-decoration: none; }
+.chip.warn { color: var(--k); border-color: color-mix(in srgb, var(--k) 40%, transparent); }
+.cluster-bar { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+@media (max-width: 520px) { .cluster-bar { grid-template-columns: 1fr; } }
+.cluster-ctl .block-title { margin-bottom: 6px; }
+.cluster-ctl.ctxfits { display: flex; flex-direction: column; justify-content: center; }
+.segmented.sparks label { font-family: var(--mono); }
+
+/* quant ladder */
+.ladder { display: flex; flex-direction: column; gap: 4px; }
+.ladder-row { display: grid; grid-template-columns: 150px 1fr 62px 78px; align-items: center; gap: 10px;
+  appearance: none; background: transparent; border: 1px solid transparent; border-radius: 8px;
+  padding: 5px 8px; cursor: pointer; text-align: left; color: var(--text);
+  transition: background 140ms cubic-bezier(0.16,1,0.3,1), border-color 140ms cubic-bezier(0.16,1,0.3,1); }
+.ladder-row:hover { background: var(--panel2); }
+.ladder-row.sel { border-color: color-mix(in srgb, var(--accent) 55%, transparent); background: color-mix(in srgb, var(--accent) 10%, transparent); }
+.lr-label { font-size: 12px; color: var(--dim); font-family: var(--mono); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ladder-row.sel .lr-label { color: var(--text); }
+.lr-bar { position: relative; height: 16px; background: var(--panel2); border-radius: 4px; overflow: hidden; display: flex; }
+.lr-fit { height: 100%; background: var(--ok); }
+.lr-over { height: 100%; background: var(--no); }
+.lr-usable { position: absolute; top: -2px; bottom: -2px; width: 0; border-left: 2px dashed var(--text); opacity: 0.5; }
+.lr-gb { font-family: var(--mono); font-size: 12.5px; font-weight: 600; text-align: right; }
+.lr-gb.over { color: var(--no); }
+.lr-tok { font-family: var(--mono); font-size: 12px; color: var(--dim); text-align: right; }
+
+/* per-node cards */
+.node-cards { display: flex; gap: 12px; flex-wrap: wrap; }
+.ncard { flex: 1 1 130px; min-width: 120px; max-width: 220px; }
+.ncard-head { font-size: 12.5px; font-family: var(--mono); font-weight: 600; margin-bottom: 6px; display: flex; align-items: center; gap: 6px; }
+.ncard-role { font-size: 9.5px; color: var(--dim); background: var(--panel2); border: 1px solid var(--border); border-radius: 4px; padding: 1px 5px; letter-spacing: 0.04em; }
+.ncard-stack { display: flex; flex-direction: column; height: 260px; border: 1px solid var(--border);
+  border-radius: 8px; overflow: hidden; background: var(--panel2); }
+.ncard.over .ncard-stack { border-color: var(--no); }
+.ncard-seg { width: 100%; position: relative; display: flex; align-items: center; justify-content: center;
+  overflow: hidden; transition: height 200ms cubic-bezier(0.16,1,0.3,1); }
+.ncard-seg.free { background: repeating-linear-gradient(45deg, transparent, transparent 6px,
+  color-mix(in srgb, var(--dim) 14%, transparent) 6px, color-mix(in srgb, var(--dim) 14%, transparent) 12px); }
+.ncard-seg.overhead { background: var(--o); }
+.ncard-seg.kv { background: var(--k); }
+.ncard-seg.dense { background: var(--accent); }
+.ncard-seg.expert { background: var(--ok); }
+.seg-label { font-size: 10px; line-height: 1.25; text-align: center; color: #0f1115; font-weight: 600; padding: 2px; }
+.ncard-seg.free .seg-label { color: var(--dim); }
+.ncard-foot { font-size: 12px; font-family: var(--mono); margin-top: 6px; }
+.ncard-foot b.over { color: var(--no); }
+.node-legend { margin-top: 12px; }
+.node-legend .dot { width: 9px; height: 9px; border-radius: 2px; display: inline-block; margin: 0 3px 0 10px; vertical-align: middle; }
+.node-legend .dot:first-child { margin-left: 0; }
+.spark-note { font-size: 11px; margin-top: 14px; line-height: 1.5; }
+.spark-note a { color: var(--accent); }
