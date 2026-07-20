@@ -253,7 +253,7 @@ function nodeCardHTML(n, i) {
   const overhead = n.overheadGB + n.draftGB;
   const over = n.freeGB < 0;
   return `<div class="ncard${over ? " over" : ""}">
-    <div class="ncard-head">spark${i + 1} <span class="ncard-role">${n.role}</span></div>
+    <div class="ncard-head">노드 ${i + 1} <span class="ncard-role">${n.role}</span></div>
     <div class="ncard-stack">
       ${seg(Math.max(0, n.freeGB), "free", n.freeGB > 3 ? `${fmt(n.freeGB, 0)} GB free` : "")}
       ${seg(overhead, "overhead", "")}
