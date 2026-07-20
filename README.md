@@ -39,9 +39,9 @@
 
 > MLA(Kimi·DeepSeek)는 압축 KV 캐시를, GLM-5.2는 희소 어텐션(DSA)을, Nemotron 3·Granite 4·gpt-oss는 하이브리드 Mamba/슬라이딩윈도우를 씁니다. 하이브리드 Mamba 모델은 어텐션 층에만 KV가 붙으므로 `n_layers`를 어텐션 층 수로 잡아 반영했고, 나머지는 보수적 상한 근사입니다.
 
-## Spark 배치 · 노드별 메모리 (howtospark-style)
+## 노드별 배치 · 멀티노드 메모리 (howtospark-style)
 
-세 번째 탭 **"Spark 배치"** 는 [howtospark.com](https://howtospark.com/)의 "on the Sparks" 뷰를 이식한 것으로, 큰 MoE 모델을 **여러 노드(GPU) 클러스터에 얹었을 때 노드마다 메모리가 어떻게 쌓이는지**를 보여줍니다.
+세 번째 탭 **"노드별 배치"** 는 [howtospark.com](https://howtospark.com/)의 "on the Sparks" 뷰를 **임의 GPU로 일반화**한 것으로, 큰 MoE 모델을 **왼쪽에서 고른 GPU 여러 대(노드) 클러스터에 얹었을 때 노드마다 메모리가 어떻게 쌓이는지**를 보여줍니다. GPU는 DGX Spark뿐 아니라 H100·MI300X·B200 등 내장 가속기 무엇이든 선택할 수 있고, 노드 카드·배지·usable은 그 GPU에 맞춰 계산됩니다.
 
 - **노드 수 강제 선택 (1×~4×)** — auto TP가 아니라 원하는 노드 수를 고정하고 fit 여부를 봅니다. 가중치·KV는 노드로 텐서-병렬 샤딩됩니다.
 - **양자화 사다리** — 모든 양자화(native bf16 · 무손실 엔트로피 · 8-bit · 4-bit · 1-bit GGUF · **2-bit experts + FP8/NVFP4 dense**)를 한 화면에서 막대(초록=usable 안, 빨강=초과)+총 GB+tok/s로 비교. mixed-precision은 MoE **expert planes를 저비트**, **dense backbone을 별도 정밀도**로 나눠 계산합니다.
