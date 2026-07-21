@@ -214,6 +214,167 @@
     };
   }
 
+  // ---- SGLang / TensorRT-LLM serving readiness (arch-match + hardware gate) --
+  // Shared engine-verdict core. A curated model carries its canonical HF arch in
+  // model.vllm.arch; we match that (or a fetched config's architectures[0]) against
+  // the engine's arch_support map, then apply the engine's hardware gate. Per-model
+  // overrides (model.sglang / model.trtllm) win when present (e.g. null-arch models).
+  const ENGINE_TIER_LABEL = {
+    native: "네이티브 지원",
+    partial: "부분 지원 — 확인 필요",
+    unsupported: "미지원",
+    unknown: "판정 불가",
+    incompatible: "하드웨어 미지원",
+  };
+
+  // Hardware compatibility: engine support JSON lists unsupported accelerator kinds.
+  function engineHardwareGate(gpu, support) {
+    const hw = support && support.hardware;
+    if (!hw || !gpu) return { compatible: true };
+    const un = hw.unsupported_kinds || [];
+    if (un.indexOf(gpu.kind) !== -1) return { compatible: false, reason: hw.note || "이 하드웨어는 지원되지 않습니다." };
+    return { compatible: true };
+  }
+
+  // o: { arch, override, gpu }  ·  support = parsed engine-support JSON
+  function engineVerdict(o, support) {
+    const ver = (support && support.version) || "unknown";
+    const archMap = (support && support.arch_support) || {};
+    const hw = engineHardwareGate(o.gpu, support);
+    if (!hw.compatible) {
+      return { tier: "incompatible", label: ENGINE_TIER_LABEL.incompatible, ok: false,
+        arch: o.arch || null, min_ver: ver, caveats: [hw.reason], source: "hardware",
+        version: ver, hardwareBlocked: true };
+    }
+    let tier, arch = o.arch || null, minVer = ver, caveats = [], source;
+    const override = o.override;
+    if (override && override.tier) {
+      tier = override.tier; caveats = (override.caveats || []).slice();
+      minVer = override.min_ver || ver; arch = override.arch || arch; source = "override";
+    } else if (arch && archMap[arch]) {
+      const a = archMap[arch]; tier = a.tier; caveats = (a.caveats || []).slice();
+      minVer = a.min_ver || ver; source = "arch";
+    } else if (arch) {
+      tier = "unsupported"; source = "arch";
+      caveats.push("엔진 모델 레지스트리에 없는 아키텍처(" + arch + ") — 지원 확인/실측이 필요합니다.");
+    } else {
+      tier = "unknown"; source = "none";
+      caveats.push("아키텍처를 읽지 못해 판정할 수 없습니다 — 모델 카드를 확인하세요.");
+    }
+    const ok = tier === "native" || tier === "partial";
+    return { tier, label: ENGINE_TIER_LABEL[tier] || tier, ok, arch, min_ver: minVer,
+      caveats, source, version: ver };
+  }
+
+  // Normalize a verdict input ({curated} or {config,id}) to { arch, model, id, custom, quantMethod }.
+  function engineResolveInput(input) {
+    if (input && input.curated) {
+      const m = input.curated;
+      return { arch: (m.vllm && m.vllm.arch) || null, model: m, id: m.hf, custom: false, quantMethod: null };
+    }
+    const cfg = (input && input.config) || {};
+    const arch = Array.isArray(cfg.architectures) && cfg.architectures.length ? cfg.architectures[0] : null;
+    return { arch, model: null, id: (input && input.id) || null,
+      custom: !!(cfg.auto_map || cfg.trust_remote_code), quantMethod: detectQuantMethod(cfg) };
+  }
+
+  function sglangVerdict(input, support, gpu) {
+    const e = engineResolveInput(input);
+    const override = (e.model && e.model.sglang) || null;
+    return engineVerdict({ arch: e.arch, override, gpu }, support);
+  }
+  function trtllmVerdict(input, support, gpu) {
+    const e = engineResolveInput(input);
+    const override = (e.model && e.model.trtllm) || null;
+    return engineVerdict({ arch: e.arch, override, gpu }, support);
+  }
+
+  // Map calculator "what-if" quant (or a detected checkpoint method) to an engine flag value.
+  function sglangQuantFlag(uiQuant, cfgMethod) {
+    const m = String(cfgMethod || "").toLowerCase();
+    if (m.includes("awq")) return "awq";
+    if (m.includes("gptq")) return "gptq";
+    if (m.includes("mxfp4")) return "mxfp4";
+    if (m.includes("nvfp4") || m.includes("modelopt")) return "modelopt_fp4";
+    if (m.includes("fp8")) return "fp8";
+    if (m) return m;
+    switch (uiQuant) {
+      case "fp8": return "fp8";
+      case "int8": return "w8a8_int8";
+      case "nvfp4": return "modelopt_fp4";
+      case "mxfp4": return "mxfp4";
+      case "int4": return "awq";
+      default: return null; // fp16/bf16 -> no flag
+    }
+  }
+  function trtllmQuantFlag(uiQuant, cfgMethod) {
+    const m = String(cfgMethod || "").toLowerCase();
+    if (m.includes("nvfp4") || m.includes("modelopt")) return "modelopt_fp4";
+    if (m.includes("awq")) return "int4_awq";
+    if (m.includes("fp8")) return "fp8";
+    if (m) return m;
+    switch (uiQuant) {
+      case "fp8": return "fp8";
+      case "nvfp4": return "modelopt_fp4";
+      case "int8": return "int8_sq";
+      case "int4": return "int4_awq";
+      default: return null;
+    }
+  }
+
+  // Serving-spec builders — same input shape as buildServingSpec, engine-specific command.
+  function buildSglangSpec(o) {
+    const id = o.modelId;
+    const name = servedName(id);
+    const tp = Math.max(1, Math.floor(o.gpuCount || 1));
+    const wantCtx = o.context || 8192;
+    const maxCtx = o.modelMaxContext || wantCtx;
+    const maxLen = Math.max(1024, Math.min(wantCtx, maxCtx));
+    const port = 30000;
+    const cmd = ["python3", "-m", "sglang.launch_server", "--model-path", id,
+      "--served-model-name", name, "--host", "0.0.0.0", "--port", String(port)];
+    if (tp > 1) cmd.push("--tp", String(tp));
+    cmd.push("--context-length", String(maxLen));
+    cmd.push("--mem-fraction-static", "0.90");
+    cmd.push("--max-running-requests", String(Math.max(1, Math.floor(o.concurrency || 16))));
+    const qflag = sglangQuantFlag(o.quant, o.quantMethod);
+    if (qflag) cmd.push("--quantization", qflag);
+    if (o.custom) cmd.push("--trust-remote-code");
+    return {
+      engine: "sglang", engineLabel: "SGLang",
+      image: o.image || ("lmsysorg/sglang:v" + (o.version || "latest")),
+      modelId: id, servedName: name, containerName: "sglang",
+      command: cmd, args: cmd, gpuCount: tp, port, healthPath: "/health",
+      quant: qflag || null,
+      requirement: "NVIDIA Container Toolkit(또는 AMD ROCm) · 게이트 모델이면 HF_TOKEN",
+    };
+  }
+  function buildTrtllmSpec(o) {
+    const id = o.modelId;
+    const name = servedName(id);
+    const tp = Math.max(1, Math.floor(o.gpuCount || 1));
+    const wantCtx = o.context || 8192;
+    const maxCtx = o.modelMaxContext || wantCtx;
+    const maxLen = Math.max(1024, Math.min(wantCtx, maxCtx));
+    const port = 8000;
+    const cmd = ["trtllm-serve", id, "--backend", "pytorch", "--host", "0.0.0.0", "--port", String(port)];
+    if (tp > 1) cmd.push("--tp_size", String(tp));
+    cmd.push("--max_seq_len", String(maxLen));
+    cmd.push("--max_batch_size", String(Math.max(1, Math.floor(o.concurrency || 16))));
+    cmd.push("--kv_cache_free_gpu_memory_fraction", "0.90");
+    const qflag = trtllmQuantFlag(o.quant, o.quantMethod);
+    if (qflag === "fp8" || qflag === "modelopt_fp4") cmd.push("--kv_cache_dtype", "fp8");
+    if (o.custom) cmd.push("--trust_remote_code");
+    return {
+      engine: "trtllm", engineLabel: "TensorRT-LLM",
+      image: o.image || ("nvcr.io/nvidia/tensorrt-llm/release:" + (o.version || "latest")),
+      modelId: id, servedName: name, containerName: "trtllm",
+      command: cmd, args: cmd, gpuCount: tp, port, healthPath: "/health",
+      quant: qflag || null,
+      requirement: "NVIDIA GPU + NVIDIA Container Toolkit · 게이트 모델이면 HF_TOKEN · 양자화는 ModelOpt 사전 양자화 체크포인트 권장",
+    };
+  }
+
   // ---- Spark cluster / per-node memory layout (howtospark.com-style) --------
   // Faithful port of the howtospark.com "on the Sparks" view: force a node count,
   // pick a mixed-precision quant, optionally REAP-prune MoE experts, and see the
@@ -293,7 +454,7 @@
 
   // Per-node memory stack + cluster fit. context in tokens; spec = key of SPEC_MULT.
   function sparkFit(model, gpu, nodeCount, modeId, prunePct, context, spec) {
-    const nodes = Math.max(1, Math.min(4, Math.floor(nodeCount || 1)));
+    const nodes = Math.max(1, Math.min(256, Math.floor(nodeCount || 1)));
     const total = model.total_params_b;
     const mode = sparkModeById(modeId);
     const reaped = sparkReap(sparkParts(model), prunePct);
@@ -353,6 +514,8 @@
 
   const api = { compute, BYTES_PER_PARAM, KV_BYTES, MBU, BATCH_EFF,
     normalizeHfRef, vllmVerdict, buildServingSpec, servedName, vllmQuantFlag, detectQuantMethod,
+    sglangVerdict, trtllmVerdict, buildSglangSpec, buildTrtllmSpec,
+    sglangQuantFlag, trtllmQuantFlag, engineVerdict, engineHardwareGate,
     SPARK_QUANT, SPEC_MULT, sparkUsableGB, sparkParts, sparkReap, sparkFootprint,
     sparkTokS, sparkFit, sparkLadder };
   if (typeof module !== "undefined" && module.exports) module.exports = api;

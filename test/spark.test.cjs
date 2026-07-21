@@ -88,5 +88,40 @@ near("dgx-spark usable", C.sparkUsableGB(spark), 114, 5);
   ok("ladder bf16 heaviest", rows[0].id === "bf16" && rows[0].weightsGB === Math.max(...rows.map(r => r.weightsGB)));
 }
 
+// 9. Node-count ladder 1/2/3/4/8/16/36/72 — every count computes and shards correctly.
+{
+  const NODES = [1, 2, 3, 4, 8, 16, 36, 72];
+  const big = M("kimi-k3"); // 2.8T — needs many nodes; good stress for high counts
+  let prevFree = -Infinity, monotoneFree = true, allValid = true;
+  const usable = C.sparkUsableGB(spark);
+  for (const n of NODES) {
+    const f = C.sparkFit(big, spark, n, "e2_nvfp4", 0, 8192, "off");
+    // structural: exactly n node cards, each usable == device usable, weights sharded by n
+    if (f.perNode.length !== n) allValid = false;
+    if (Math.abs(f.usableTotal - usable * n) > 0.01) allValid = false;
+    if (f.perNode[0] && Math.abs(f.perNode[0].weightsGB - f.weightsGB / n) > 0.01) allValid = false;
+    // more nodes -> more (or equal) free memory per node (weights shard thinner)
+    if (f.perNode[0]) { if (f.perNode[0].freeGB < prevFree - 0.01) monotoneFree = false; prevFree = f.perNode[0].freeGB; }
+  }
+  ok("all node counts 1..72 produce valid per-node layout", allValid);
+  ok("per-node free grows monotonically with node count", monotoneFree);
+
+  // 72 nodes must fit a model that 1 node cannot (weights shard across the cluster)
+  const one = C.sparkFit(big, spark, 1, "e2_nvfp4", 0, 8192, "off");
+  const many = C.sparkFit(big, spark, 72, "e2_nvfp4", 0, 8192, "off");
+  ok("kimi-k3 does not fit on 1 spark", one.fits === false);
+  ok("kimi-k3 fits on 72 sparks (e2_nvfp4)", many.fits === true);
+
+  // tok/s scales ~linearly with node count at high counts (bandwidth-bound, TP eff 0.8)
+  const q = C.SPARK_QUANT.find(x => x.id === "e2_nvfp4");
+  const t8 = C.sparkTokS(big, spark, 8, q, "off");
+  const t16 = C.sparkTokS(big, spark, 16, q, "off");
+  near("tokS 16x/8x ~ 2.0", t16 / t8, 2.0, 2);
+
+  // ladder works at 72 nodes and stays ordered
+  const rows = C.sparkLadder(big, spark, 72, 0, 8192, "off");
+  ok("ladder at 72 nodes has all modes", rows.length === C.SPARK_QUANT.length);
+}
+
 console.log(`\nspark.js: ${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

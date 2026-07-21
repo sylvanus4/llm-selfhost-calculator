@@ -1,0 +1,70 @@
+{
+  "_note": "TensorRT-LLM 서빙 준비도 판정 근거. arch_support = 모델의 HF config.json architectures[] 대표 문자열 → TensorRT-LLM 지원 등급 매핑(전수 아님). ⚠️ 하드웨어: TensorRT-LLM은 NVIDIA GPU 전용 — AMD·Apple·NPU에서는 아예 동작하지 않는다(그 경우 tier=incompatible). NVIDIA 자사 스택이라 DeepSeek V3/GPT-OSS/Nemotron은 FP8/NVFP4로 강하게 최적화. 최신 릴리스는 PyTorch 백엔드(trtllm-serve)로 사전 엔진 빌드 없이 서빙 가능 — 예전 ahead-of-time 엔진 빌드보다 간편. 양자화는 TensorRT-Model-Optimizer로 사전 양자화한 체크포인트(FP8/NVFP4/INT4-AWQ)를 쓰는 게 정석. 이 파일은 TensorRT-LLM 릴리스마다 갱신한다(version 핀). 출처: NVIDIA/TensorRT-LLM support matrix + 릴리스 노트(2026-07). 모든 등급은 계획용 근사 — 실측 벤치 권장.",
+  "_updated": "2026-07-21",
+  "version": "1.2.0",
+  "docs": "https://nvidia.github.io/TensorRT-LLM/reference/support-matrix.html",
+  "image": "nvcr.io/nvidia/tensorrt-llm/release:1.2.0",
+  "default_port": 8000,
+  "hardware": {
+    "supported_kinds": ["gpu"],
+    "unsupported_kinds": ["amd", "apple", "npu"],
+    "note": "TensorRT-LLM은 NVIDIA GPU(Ampere/Hopper/Blackwell) 전용입니다. AMD Instinct·Apple Silicon·NPU(Furiosa/Rebellions/Gaudi/Trainium)에서는 동작하지 않습니다 — 그 하드웨어에서는 vLLM 또는 SGLang(AMD)/벤더 런타임을 사용하세요.",
+    "fp4_requires": ["b200", "b300", "gb200", "gb300", "rtx-pro-6000"]
+  },
+  "arch_support": {
+    "LlamaForCausalLM": {"tier": "native"},
+    "Llama4ForConditionalGeneration": {"tier": "native", "caveats": ["멀티모달 Llama 4 — 비전 경로 포함"]},
+    "MistralForCausalLM": {"tier": "native"},
+    "MixtralForCausalLM": {"tier": "native"},
+    "Qwen2ForCausalLM": {"tier": "native"},
+    "Qwen2MoeForCausalLM": {"tier": "native"},
+    "Qwen3ForCausalLM": {"tier": "native"},
+    "Qwen3MoeForCausalLM": {"tier": "native", "min_ver": "1.1.0"},
+    "Qwen2VLForConditionalGeneration": {"tier": "partial", "caveats": ["멀티모달 — TensorRT-LLM 비전 경로는 제한적, 실측 권장"]},
+    "Qwen3VLForConditionalGeneration": {"tier": "partial", "caveats": ["멀티모달(비전 타워) — TensorRT-LLM VL 지원은 제한적, 텍스트 경로 위주, 실측 권장"]},
+    "Gemma2ForCausalLM": {"tier": "native"},
+    "Gemma3ForCausalLM": {"tier": "native", "caveats": ["슬라이딩 윈도우 어텐션"]},
+    "Gemma3ForConditionalGeneration": {"tier": "partial", "caveats": ["슬라이딩 윈도우 · 멀티모달 — 비전 경로 제한적"]},
+    "Gemma4ForCausalLM": {"tier": "native", "caveats": ["슬라이딩 윈도우 — Gemma 4는 신규, 최신 TensorRT-LLM 필요"]},
+    "Gemma4ForConditionalGeneration": {"tier": "partial", "caveats": ["멀티모달 Gemma 4 — 텍스트 경로 위주, 비전은 제한적"]},
+    "Phi3ForCausalLM": {"tier": "native"},
+    "PhiMoEForCausalLM": {"tier": "native"},
+    "DeepseekV2ForCausalLM": {"tier": "native", "caveats": ["MLA 압축 KV 경로"]},
+    "DeepseekV3ForCausalLM": {"tier": "native", "caveats": ["FP8/NVFP4로 강하게 최적화(Hopper/Blackwell) — TensorRT-LLM 대표 경로"]},
+    "DeepseekV4ForCausalLM": {"tier": "native", "min_ver": "1.2.0", "caveats": ["DeepSeek V4 — 압축 KV/희소 인덱서, 최신 TensorRT-LLM 필요"]},
+    "GlmForCausalLM": {"tier": "native"},
+    "Glm4ForCausalLM": {"tier": "native"},
+    "Glm4MoeForCausalLM": {"tier": "partial", "min_ver": "1.2.0", "caveats": ["GLM MoE — 최신 TensorRT-LLM 빌드 필요, DSA 희소 어텐션 경로 실측 권장"]},
+    "GptOssForCausalLM": {"tier": "native", "caveats": ["MXFP4/NVFP4 — NVIDIA 협업 최적화, Blackwell 계열 권장"]},
+    "NemotronForCausalLM": {"tier": "native", "caveats": ["NVIDIA 자사 모델 — TensorRT-LLM 우선 지원"]},
+    "NemotronHForCausalLM": {"tier": "native", "min_ver": "1.1.0", "caveats": ["하이브리드 Mamba-2 — NVIDIA 자사 모델, TensorRT-LLM 지원"]},
+    "GraniteForCausalLM": {"tier": "native"},
+    "GraniteMoeForCausalLM": {"tier": "partial", "caveats": ["Granite MoE — 최신 빌드 권장"]},
+    "GraniteMoeHybridForCausalLM": {"tier": "partial", "min_ver": "1.2.0", "caveats": ["하이브리드 Mamba-2/MoE — TensorRT-LLM 하이브리드 지원 확인/실측 필요"]},
+    "MiniMaxText01ForCausalLM": {"tier": "unsupported", "caveats": ["MiniMax — TensorRT-LLM 모델 레지스트리 미등록, 지원 확인/실측 필요"]},
+    "MiniMaxM2ForCausalLM": {"tier": "unsupported", "caveats": ["MiniMax M2 — TensorRT-LLM 미등록, 지원 확인/실측 필요"]},
+    "CohereForCausalLM": {"tier": "native"},
+    "Cohere2ForCausalLM": {"tier": "native"},
+    "InternLM2ForCausalLM": {"tier": "native"},
+    "Starcoder2ForCausalLM": {"tier": "native"}
+  },
+  "quant_methods": {
+    "fp8": "FP8 (E4M3). Hopper/Blackwell 텐서코어. ModelOpt 사전 양자화 또는 --kv_cache_dtype fp8.",
+    "modelopt_fp4": "NVFP4 (TensorRT-Model-Optimizer). Blackwell FP4 텐서코어 필요.",
+    "int4_awq": "INT4 AWQ (activation-aware). ModelOpt 양자화.",
+    "int8_sq": "INT8 SmoothQuant. ModelOpt 양자화.",
+    "w4a8_awq": "W4A8 AWQ (4-bit weight + 8-bit activation). Hopper+ 권장."
+  },
+  "quant_hardware_hint": {
+    "modelopt_fp4": ["b200", "b300", "gb200", "gb300", "rtx-pro-6000"],
+    "fp8": ["h100-80", "h200", "b200", "b300", "gb200", "gb300", "rtx-pro-6000"],
+    "int4_awq": ["a100-40", "a100-80", "h100-80", "h200", "l40s", "a6000", "rtx4090", "b200", "b300", "rtx-pro-6000"]
+  },
+  "tier_help": {
+    "native": "TensorRT-LLM에 전용 최적화 경로가 있어 NVIDIA GPU에서 최고 처리량으로 서빙됩니다. 최신 릴리스는 trtllm-serve(PyTorch 백엔드)로 사전 엔진 빌드 없이 바로 구동 가능합니다.",
+    "partial": "TensorRT-LLM이 지원하지만 신규/멀티모달 경로라 최신 릴리스가 필요하고 정확도/성능은 실측 권장입니다.",
+    "unsupported": "TensorRT-LLM 모델 레지스트리에 아직 없는 아키텍처입니다 — vLLM 또는 SGLang을 사용하거나 지원 확인이 필요합니다.",
+    "unknown": "config.json에서 architectures를 읽지 못해 판정할 수 없습니다. 모델 카드를 직접 확인하세요.",
+    "incompatible": "TensorRT-LLM은 NVIDIA GPU 전용입니다 — 선택한 하드웨어(AMD/Apple/NPU)에서는 동작하지 않습니다."
+  }
+}
