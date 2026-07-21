@@ -9,25 +9,37 @@
 </head>
 <body>
 <header>
-  <h1>LLM 자체호스팅 계산기</h1>
-  <p class="sub">이 모델, 내 하드웨어에서 돌아갈까? API보다 쌀까? — VRAM 적합성 · 토큰 속도 · 손익분기를 즉시 계산합니다. <b>키 없음 · 서버 없음 · 데이터 전송 없음.</b></p>
+  <div class="header-top">
+    <h1 data-i18n="h1">LLM 자체호스팅 계산기</h1>
+    <div class="controls">
+      <div class="toggle-group" id="langToggle" role="group" aria-label="Language">
+        <button type="button" data-lang="ko">한국어</button>
+        <button type="button" data-lang="en">EN</button>
+      </div>
+      <div class="toggle-group" id="themeToggle" role="group" aria-label="Theme">
+        <button type="button" data-theme-set="light" title="Light" aria-label="Light">☀</button>
+        <button type="button" data-theme-set="dark" title="Dark" aria-label="Dark">☾</button>
+      </div>
+    </div>
+  </div>
+  <p class="sub" data-i18n-html="sub">이 모델, 내 하드웨어에서 돌아갈까? API보다 쌀까? — VRAM 적합성 · 토큰 속도 · 손익분기를 즉시 계산합니다. <b>키 없음 · 서버 없음 · 데이터 전송 없음.</b></p>
 </header>
 
 <main id="app">
   <section class="panel inputs">
-    <h2>입력</h2>
-    <label>모델 <span class="hint">최신순</span> <select id="model"></select></label>
+    <h2 data-i18n="inputs.h2">입력</h2>
+    <label><span data-i18n="lbl.model">모델</span> <span class="hint" data-i18n="hint.newest">최신순</span> <select id="model"></select></label>
     <div class="chips" id="modelChips"></div>
     <div class="model-note" id="modelNote"></div>
 
-    <label>또는 HF 모델 URL/ID <span class="hint">붙여넣으면 파싱</span>
-      <input type="text" id="hfRef" list="hfList" placeholder="huggingface.co/Qwen/Qwen3-8B 또는 Qwen/Qwen3-8B" autocomplete="off">
+    <label><span data-i18n="lbl.hfref">또는 HF 모델 URL/ID</span> <span class="hint" data-i18n="hint.paste">붙여넣으면 파싱</span>
+      <input type="text" id="hfRef" list="hfList" data-i18n-ph="ph.hfref" placeholder="huggingface.co/Qwen/Qwen3-8B 또는 Qwen/Qwen3-8B" autocomplete="off">
     </label>
     <datalist id="hfList"></datalist>
     <div class="model-note" id="hfRefStatus"></div>
-    <button type="button" id="hfFetchBtn" class="fetch-btn" hidden>HF에서 config.json 불러오기 (외부 요청)</button>
+    <button type="button" id="hfFetchBtn" class="fetch-btn" hidden data-i18n="btn.hffetch">HF에서 config.json 불러오기 (외부 요청)</button>
 
-    <label>양자화 <span class="hint">4-bit는 아래 설명 참고</span>
+    <label><span data-i18n="lbl.quant">양자화</span> <span class="hint" data-i18n="hint.quant">4-bit는 아래 설명 참고</span>
       <select id="quant">
         <option value="fp16">FP16 / BF16 (2 bytes/param)</option>
         <option value="fp8">FP8 E4M3 (1 byte · Hopper·Blackwell)</option>
@@ -38,96 +50,96 @@
       </select>
     </label>
 
-    <label>하드웨어 <select id="gpu"></select></label>
+    <label><span data-i18n="lbl.hardware">하드웨어</span> <select id="gpu"></select></label>
 
-    <label>컨텍스트 길이 <span class="lab" id="contextLabel"></span>
+    <label><span data-i18n="lbl.context">컨텍스트 길이</span> <span class="lab" id="contextLabel"></span>
       <input type="range" id="context" min="2048" max="262144" step="2048" value="8192">
     </label>
 
-    <label>동시 요청 <span class="lab" id="concurrencyLabel"></span>
+    <label><span data-i18n="lbl.concurrency">동시 요청</span> <span class="lab" id="concurrencyLabel"></span>
       <input type="range" id="concurrency" min="1" max="128" step="1" value="16">
     </label>
 
-    <label>원가 모드
+    <label><span data-i18n="lbl.costmode">원가 모드</span>
       <div class="segmented" id="costMode">
-        <label><input type="radio" name="costmode" value="rent" checked> 임대 (클라우드 $/hr)</label>
-        <label><input type="radio" name="costmode" value="own"> 구매 (온프렘 회수)</label>
+        <label><input type="radio" name="costmode" value="rent" checked> <span data-i18n="opt.rent">임대 (클라우드 $/hr)</span></label>
+        <label><input type="radio" name="costmode" value="own"> <span data-i18n="opt.own">구매 (온프렘 회수)</span></label>
       </div>
     </label>
 
     <div id="rentGroup">
-      <label>GPU 렌트 단가 override ($/hr, 비우면 기본값)
-        <input type="text" id="rent" inputmode="decimal" placeholder="예: 2.5">
+      <label><span data-i18n="lbl.rent">GPU 렌트 단가 override ($/hr, 비우면 기본값)</span>
+        <input type="text" id="rent" inputmode="decimal" data-i18n-ph="ph.rent" placeholder="예: 2.5">
       </label>
     </div>
 
     <div id="ownInputs" hidden>
-      <label>전기 단가 ($/kWh) <span class="hint">KR 산업용 ≈ ₩150 ≈ $0.11</span>
+      <label><span data-i18n="lbl.kwh">전기 단가 ($/kWh)</span> <span class="hint" data-i18n="hint.kwh">KR 산업용 ≈ ₩150 ≈ $0.11</span>
         <input type="text" id="kwh" inputmode="decimal" value="0.12">
       </label>
-      <label>월 예상 토큰량 <span class="lab" id="mtokLabel"></span>
+      <label><span data-i18n="lbl.mtok">월 예상 토큰량</span> <span class="lab" id="mtokLabel"></span>
         <input type="range" id="monthlyTokens" min="0.1" max="200" step="0.1" value="5">
       </label>
-      <label>구매가 override ($/장비, 비우면 데이터 기본값)
-        <input type="text" id="capex" inputmode="decimal" placeholder="예: 28000">
+      <label><span data-i18n="lbl.capex">구매가 override ($/장비, 비우면 데이터 기본값)</span>
+        <input type="text" id="capex" inputmode="decimal" data-i18n-ph="ph.capex" placeholder="예: 28000">
       </label>
     </div>
 
-    <label>비교 API 프리셋 <select id="apiPreset"></select></label>
-    <label>비교 API 단가 ($/1M tok)
+    <label><span data-i18n="lbl.apipreset">비교 API 프리셋</span> <select id="apiPreset"></select></label>
+    <label><span data-i18n="lbl.api">비교 API 단가 ($/1M tok)</span>
       <input type="text" id="api" inputmode="decimal" value="0.8">
     </label>
   </section>
 
   <section class="panel results">
     <div class="tabs" id="resultTabs">
-      <button type="button" class="tab active" data-panel="calc">비용 · 적합성</button>
-      <button type="button" class="tab" data-panel="spark">노드별 배치</button>
-      <button type="button" class="tab" data-panel="vllm">vLLM 서빙 준비도</button>
-      <button type="button" class="tab" data-panel="sglang">SGLang 서빙 준비도</button>
-      <button type="button" class="tab" data-panel="trt">TensorRT-LLM 서빙 준비도</button>
+      <button type="button" class="tab active" data-panel="calc" data-i18n="tab.calc">비용 · 적합성</button>
+      <button type="button" class="tab" data-panel="spark" data-i18n="tab.spark">노드별 배치</button>
+      <button type="button" class="tab" data-panel="vllm" data-i18n="tab.vllm">vLLM 서빙 준비도</button>
+      <button type="button" class="tab" data-panel="sglang" data-i18n="tab.sglang">SGLang 서빙 준비도</button>
+      <button type="button" class="tab" data-panel="trt" data-i18n="tab.trt">TensorRT-LLM 서빙 준비도</button>
     </div>
     <div id="panelCalc">
-    <h2>결과 <span id="fitBadge"></span></h2>
+    <h2><span data-i18n="calc.h2">결과</span> <span id="fitBadge"></span></h2>
 
     <div class="block">
       <div class="block-title">VRAM</div>
       <div class="vram-bar" id="vramBar"></div>
-      <div class="legend"><span class="dot w"></span>가중치 <span class="dot k"></span>KV캐시 <span class="dot o"></span>오버헤드 <span class="cap-legend"></span>장비 VRAM 한계</div>
+      <div class="legend"><span class="dot w"></span><span data-i18n="legend.weights">가중치</span> <span class="dot k"></span><span data-i18n="legend.kv">KV캐시</span> <span class="dot o"></span><span data-i18n="legend.overhead">오버헤드</span> <span class="cap-legend"></span><span data-i18n="legend.vramcap">장비 VRAM 한계</span></div>
       <div class="nums" id="vramNums"></div>
     </div>
 
     <div class="block grid2">
-      <div><div class="block-title">추론 속도</div><div id="tokS"></div></div>
-      <div><div class="block-title">서빙 처리량</div><div id="throughput"></div></div>
+      <div><div class="block-title" data-i18n="calc.tokS">추론 속도</div><div id="tokS"></div></div>
+      <div><div class="block-title" data-i18n="calc.throughput">서빙 처리량</div><div id="throughput"></div></div>
     </div>
 
     <div class="block">
-      <div class="block-title">자체호스팅 vs API</div>
+      <div class="block-title" data-i18n="calc.selfvsapi">자체호스팅 vs API</div>
       <div id="costBox"></div>
     </div>
     </div><!-- /panelCalc -->
 
     <div id="panelVllm" hidden>
-      <h2>vLLM 서빙 준비도 <span id="vllmBadge"></span></h2>
+      <h2>vLLM <span data-i18n="tab.vllm">vLLM 서빙 준비도</span> <span id="vllmBadge"></span></h2>
       <div class="block">
-        <div class="block-title">판정</div>
+        <div class="block-title" data-i18n="rd.verdict">판정</div>
         <div id="vllmVerdictBox"></div>
       </div>
       <div class="block">
-        <div class="block-title">서빙 명령 (계산기 입력에서 도출)</div>
+        <div class="block-title" data-i18n="rd.servecmd">서빙 명령 (계산기 입력에서 도출)</div>
         <div id="vllmParams"></div>
       </div>
       <div class="block">
-        <div class="block-title">배포 매니페스트</div>
+        <div class="block-title" data-i18n="rd.manifest">배포 매니페스트</div>
         <div class="tabs sub" id="manifestTabs">
           <button type="button" class="tab active" data-mf="compose">docker-compose</button>
           <button type="button" class="tab" data-mf="k8s">Kubernetes</button>
           <button type="button" class="tab" data-mf="helm">Helm</button>
         </div>
         <div class="mf-actions">
-          <button type="button" id="mfCopy" class="fetch-btn">복사</button>
-          <button type="button" id="mfDownload" class="fetch-btn">다운로드</button>
+          <button type="button" id="mfCopy" class="fetch-btn" data-i18n="btn.copy">복사</button>
+          <button type="button" id="mfDownload" class="fetch-btn" data-i18n="btn.download">다운로드</button>
           <span id="mfStatus" class="dim"></span>
         </div>
         <pre class="code"><code id="manifestCode"></code></pre>
@@ -135,25 +147,25 @@
     </div><!-- /panelVllm -->
 
     <div id="panelSglang" hidden>
-      <h2>SGLang 서빙 준비도 <span id="sglangBadge"></span></h2>
+      <h2><span data-i18n="tab.sglang">SGLang 서빙 준비도</span> <span id="sglangBadge"></span></h2>
       <div class="block">
-        <div class="block-title">판정</div>
+        <div class="block-title" data-i18n="rd.verdict">판정</div>
         <div id="sglangVerdictBox"></div>
       </div>
       <div class="block">
-        <div class="block-title">서빙 명령 (계산기 입력에서 도출)</div>
+        <div class="block-title" data-i18n="rd.servecmd">서빙 명령 (계산기 입력에서 도출)</div>
         <div id="sglangParams"></div>
       </div>
       <div class="block">
-        <div class="block-title">배포 매니페스트</div>
+        <div class="block-title" data-i18n="rd.manifest">배포 매니페스트</div>
         <div class="tabs sub" id="sglangManifestTabs">
           <button type="button" class="tab active" data-mf="compose">docker-compose</button>
           <button type="button" class="tab" data-mf="k8s">Kubernetes</button>
           <button type="button" class="tab" data-mf="helm">Helm</button>
         </div>
         <div class="mf-actions">
-          <button type="button" id="sglangMfCopy" class="fetch-btn">복사</button>
-          <button type="button" id="sglangMfDownload" class="fetch-btn">다운로드</button>
+          <button type="button" id="sglangMfCopy" class="fetch-btn" data-i18n="btn.copy">복사</button>
+          <button type="button" id="sglangMfDownload" class="fetch-btn" data-i18n="btn.download">다운로드</button>
           <span id="sglangMfStatus" class="dim"></span>
         </div>
         <pre class="code"><code id="sglangManifestCode"></code></pre>
@@ -161,25 +173,25 @@
     </div><!-- /panelSglang -->
 
     <div id="panelTrt" hidden>
-      <h2>TensorRT-LLM 서빙 준비도 <span id="trtBadge"></span></h2>
+      <h2><span data-i18n="tab.trt">TensorRT-LLM 서빙 준비도</span> <span id="trtBadge"></span></h2>
       <div class="block">
-        <div class="block-title">판정</div>
+        <div class="block-title" data-i18n="rd.verdict">판정</div>
         <div id="trtVerdictBox"></div>
       </div>
       <div class="block">
-        <div class="block-title">서빙 명령 (계산기 입력에서 도출)</div>
+        <div class="block-title" data-i18n="rd.servecmd">서빙 명령 (계산기 입력에서 도출)</div>
         <div id="trtParams"></div>
       </div>
       <div class="block">
-        <div class="block-title">배포 매니페스트</div>
+        <div class="block-title" data-i18n="rd.manifest">배포 매니페스트</div>
         <div class="tabs sub" id="trtManifestTabs">
           <button type="button" class="tab active" data-mf="compose">docker-compose</button>
           <button type="button" class="tab" data-mf="k8s">Kubernetes</button>
           <button type="button" class="tab" data-mf="helm">Helm</button>
         </div>
         <div class="mf-actions">
-          <button type="button" id="trtMfCopy" class="fetch-btn">복사</button>
-          <button type="button" id="trtMfDownload" class="fetch-btn">다운로드</button>
+          <button type="button" id="trtMfCopy" class="fetch-btn" data-i18n="btn.copy">복사</button>
+          <button type="button" id="trtMfDownload" class="fetch-btn" data-i18n="btn.download">다운로드</button>
           <span id="trtMfStatus" class="dim"></span>
         </div>
         <pre class="code"><code id="trtManifestCode"></code></pre>
@@ -187,7 +199,7 @@
     </div><!-- /panelTrt -->
 
     <div id="panelSpark" hidden>
-      <h2>노드별 배치 <span id="sparkBadge"></span></h2>
+      <h2><span data-i18n="tab.spark">노드별 배치</span> <span id="sparkBadge"></span></h2>
       <div class="spark-model-head">
         <div class="spark-model-name" id="sparkModelName"></div>
         <div class="chips" id="sparkChips"></div>
@@ -196,7 +208,7 @@
       <div class="block">
         <div class="cluster-bar">
           <div class="cluster-ctl">
-            <div class="block-title">노드 수 <span class="dim" id="sparkGpuName"></span></div>
+            <div class="block-title"><span data-i18n="spark.nodes">노드 수</span> <span class="dim" id="sparkGpuName"></span></div>
             <div class="segmented sparks" id="sparkNodes">
               <label><input type="radio" name="sparknodes" value="1"> 1×</label>
               <label><input type="radio" name="sparknodes" value="2" checked> 2×</label>
@@ -209,7 +221,7 @@
             </div>
           </div>
           <div class="cluster-ctl">
-            <div class="block-title">REAP 전문가 프루닝 <span class="lab" id="sparkReapLabel"></span></div>
+            <div class="block-title"><span data-i18n="spark.reap">REAP 전문가 프루닝</span> <span class="lab" id="sparkReapLabel"></span></div>
             <input type="range" id="sparkReap" min="0" max="50" step="1" value="0">
             <div class="dim" id="sparkReapNote"></div>
           </div>
@@ -217,14 +229,14 @@
       </div>
 
       <div class="block">
-        <div class="block-title">양자화 사다리 <span class="dim">— 막대 = usable 대비 · 초록 fit · 빨강 초과</span></div>
+        <div class="block-title"><span data-i18n="spark.ladder">양자화 사다리</span> <span class="dim" data-i18n="spark.ladderhint">— 막대 = usable 대비 · 초록 fit · 빨강 초과</span></div>
         <div class="ladder" id="sparkLadder"></div>
       </div>
 
       <div class="block">
         <div class="cluster-bar">
           <div class="cluster-ctl">
-            <div class="block-title">추측 디코딩 (spec decode)</div>
+            <div class="block-title" data-i18n="spark.specdecode">추측 디코딩 (spec decode)</div>
             <div class="segmented" id="sparkSpec">
               <label><input type="radio" name="sparkspec" value="off" checked> off</label>
               <label><input type="radio" name="sparkspec" value="ngram"> n-gram</label>
@@ -234,24 +246,24 @@
             </div>
           </div>
           <div class="cluster-ctl ctxfits">
-            <div class="block-title">컨텍스트</div>
+            <div class="block-title" data-i18n="spark.context">컨텍스트</div>
             <div id="sparkCtxFits" class="dim"></div>
           </div>
         </div>
       </div>
 
       <div class="block">
-        <div class="block-title" id="sparkNodesTitle">노드별 메모리</div>
+        <div class="block-title" id="sparkNodesTitle" data-i18n="spark.nodemem">노드별 메모리</div>
         <div class="node-cards" id="sparkNodeCards"></div>
         <div class="legend node-legend">
           <span class="dot" style="background:var(--ok)"></span>Expert planes
           <span class="dot" style="background:var(--accent)"></span>Dense
           <span class="dot" style="background:var(--k)"></span>KV cache
-          <span class="dot" style="background:var(--o)"></span>오버헤드
+          <span class="dot" style="background:var(--o)"></span><span data-i18n="legend.overhead2">오버헤드</span>
         </div>
       </div>
 
-      <div class="spark-note dim">
+      <div class="spark-note dim" data-i18n-html="spark.note">
         모든 수치는 <b>계획용 근사</b>입니다 — bpp·세그먼트는 <a href="https://howtospark.com/" target="_blank" rel="noopener">howtospark.com</a> recipe와
         <a href="https://github.com/Sapid-Labs/vLLM-Moet" target="_blank" rel="noopener">vLLM-Moet</a> 커널에 앵커링. REAP 프루닝: <a href="https://arxiv.org/abs/2510.13999" target="_blank" rel="noopener">Cerebras 2510.13999</a> (최대 50%). 실측 벤치 권장.
       </div>
@@ -260,19 +272,19 @@
 </main>
 
 <section class="reference" id="reference">
-  <h2>참고 · 이미지 생성 &amp; 음성(STT/TTS) 최신 모델·API 가격</h2>
-  <p class="ref-sub">아래는 <b>토큰 단위가 아니라서</b> 위 토큰 계산기와 1:1로 비교되지 않는 항목입니다 — 이미지 생성 API, 그리고 음성(STT/TTS) 자체호스팅 모델과 API 가격을 <b>최신 참고용</b>으로 정리했습니다. 모두 공개 정보 기반 근사입니다.</p>
+  <h2 data-i18n-html="ref.h2">참고 · 이미지 생성 &amp; 음성(STT/TTS) 최신 모델·API 가격</h2>
+  <p class="ref-sub" data-i18n-html="ref.sub">아래는 <b>토큰 단위가 아니라서</b> 위 토큰 계산기와 1:1로 비교되지 않는 항목입니다 — 이미지 생성 API, 그리고 음성(STT/TTS) 자체호스팅 모델과 API 가격을 <b>최신 참고용</b>으로 정리했습니다. 모두 공개 정보 기반 근사입니다.</p>
   <div class="ref-grid">
     <div class="ref-card">
-      <h3>이미지 생성 API</h3>
+      <h3 data-i18n="ref.image">이미지 생성 API</h3>
       <div class="ref-table" id="refImage"></div>
     </div>
     <div class="ref-card">
-      <h3>음성 STT/TTS — 자체호스팅 모델</h3>
+      <h3 data-i18n="ref.speechself">음성 STT/TTS — 자체호스팅 모델</h3>
       <div class="ref-table" id="refSpeechSelf"></div>
     </div>
     <div class="ref-card">
-      <h3>음성 STT/TTS — API 가격</h3>
+      <h3 data-i18n="ref.speechapi">음성 STT/TTS — API 가격</h3>
       <div class="ref-table" id="refSpeechApi"></div>
     </div>
   </div>
@@ -280,36 +292,37 @@
 
 <section class="how">
   <details>
-    <summary>계산 방식 (투명하게)</summary>
+    <summary data-i18n="how.calc.summary">계산 방식 (투명하게)</summary>
     <ul>
-      <li><b>VRAM</b> = 가중치(<code>total_params × bytes/param</code>) + KV캐시(<code>2 × layers × kv_dim × 2B × 컨텍스트</code>, GQA 반영) + 오버헤드(<code>1.2GB + 5%</code>).</li>
-      <li><b>추론 속도</b>(단일 스트림)는 디코딩이 메모리 대역폭에 묶인다는 근사: <code>MBU(0.5) × 대역폭 ÷ (활성 파라미터 × bytes)</code>. MoE는 활성 파라미터만 세므로 빠릅니다.</li>
-      <li><b>서빙 처리량</b> = 단일속도 × 유효배치 × 0.7. 유효배치는 남은 VRAM으로 감당 가능한 동시 시퀀스 수로 상한.</li>
-      <li><b>손익분기 (임대)</b>: 자체호스팅 $/1M = <code>(렌트/시간 ÷ 3600) ÷ 처리량 × 1e6</code>. 이 값이 API 단가보다 낮으면(=GPU를 충분히 채우면) 자체호스팅이 쌉니다.</li>
-      <li><b>회수 개월 (구매/온프렘)</b>: 장비를 <b>사는</b> 경우 — <code>capex = 구매가 × 필요 GPU수</code>, 월 전기료 = <code>전력(kW) × 월 토큰 생성에 쓴 GPU-시간 × $/kWh</code>, <code>회수개월 = capex ÷ (월 API비용 − 월 전기료)</code>. 전기료는 <b>토큰 생성에 실제 쓴 시간</b>만 계산하며 <b>idle 전력은 제외</b>합니다(실제 24/7 전용 박스는 더 듭니다). 월 순절감이 0 이하면 이 토큰량에선 회수되지 않습니다.</li>
+      <li data-i18n-html="how.calc.li1"><b>VRAM</b> = 가중치(<code>total_params × bytes/param</code>) + KV캐시(<code>2 × layers × kv_dim × 2B × 컨텍스트</code>, GQA 반영) + 오버헤드(<code>1.2GB + 5%</code>).</li>
+      <li data-i18n-html="how.calc.li2"><b>추론 속도</b>(단일 스트림)는 디코딩이 메모리 대역폭에 묶인다는 근사: <code>MBU(0.5) × 대역폭 ÷ (활성 파라미터 × bytes)</code>. MoE는 활성 파라미터만 세므로 빠릅니다.</li>
+      <li data-i18n-html="how.calc.li3"><b>서빙 처리량</b> = 단일속도 × 유효배치 × 0.7. 유효배치는 남은 VRAM으로 감당 가능한 동시 시퀀스 수로 상한.</li>
+      <li data-i18n-html="how.calc.li4"><b>손익분기 (임대)</b>: 자체호스팅 $/1M = <code>(렌트/시간 ÷ 3600) ÷ 처리량 × 1e6</code>. 이 값이 API 단가보다 낮으면(=GPU를 충분히 채우면) 자체호스팅이 쌉니다.</li>
+      <li data-i18n-html="how.calc.li5"><b>회수 개월 (구매/온프렘)</b>: 장비를 <b>사는</b> 경우 — <code>capex = 구매가 × 필요 GPU수</code>, 월 전기료 = <code>전력(kW) × 월 토큰 생성에 쓴 GPU-시간 × $/kWh</code>, <code>회수개월 = capex ÷ (월 API비용 − 월 전기료)</code>. 전기료는 <b>토큰 생성에 실제 쓴 시간</b>만 계산하며 <b>idle 전력은 제외</b>합니다(실제 24/7 전용 박스는 더 듭니다). 월 순절감이 0 이하면 이 토큰량에선 회수되지 않습니다.</li>
     </ul>
-    <p class="dim">모두 <b>근사 추정</b>입니다. 실제 수치는 커널·프레임워크·페이징·양자화 방식에 따라 달라집니다. 의사결정 전 실측 벤치를 권장합니다.</p>
+    <p class="dim" data-i18n-html="how.calc.note">모두 <b>근사 추정</b>입니다. 실제 수치는 커널·프레임워크·페이징·양자화 방식에 따라 달라집니다. 의사결정 전 실측 벤치를 권장합니다.</p>
   </details>
   <details>
-    <summary>양자화 기법 가이드 (NVFP4·MXFP4·FP8·INT4 …)</summary>
-    <p class="dim">양자화 = 가중치(와 활성값)를 더 적은 비트로 저장해 <b>VRAM과 메모리 대역폭</b>을 줄이는 것. 디코딩은 대역폭에 묶이므로, 절반 비트로 줄이면 VRAM만이 아니라 <b>tok/s도 대략 그만큼 빨라집니다</b>. 위 양자화 선택이 <code>bytes/param</code>을 바꿔 두 값 모두에 반영됩니다.</p>
+    <summary data-i18n="how.quant.summary">양자화 기법 가이드 (NVFP4·MXFP4·FP8·INT4 …)</summary>
+    <p class="dim" data-i18n-html="how.quant.p">양자화 = 가중치(와 활성값)를 더 적은 비트로 저장해 <b>VRAM과 메모리 대역폭</b>을 줄이는 것. 디코딩은 대역폭에 묶이므로, 절반 비트로 줄이면 VRAM만이 아니라 <b>tok/s도 대략 그만큼 빨라집니다</b>. 위 양자화 선택이 <code>bytes/param</code>을 바꿔 두 값 모두에 반영됩니다.</p>
     <ul>
-      <li><b>bytes/param</b>: FP16·BF16 <code>2</code> · FP8·INT8 <code>1</code> · <b>NVFP4 <code>~0.5625</code></b>(4.5bit) · MXFP4 <code>~0.53125</code>(4.25bit) · INT4 <code>0.5</code>. 4-bit 포맷은 4비트 데이터에 <b>블록 스케일</b>이 붙어 정확히 0.5는 아닙니다 — 계산기는 이 오버헤드를 반영합니다.</li>
-      <li><b>NVFP4</b> (NVIDIA): FP4 <code>E2M1</code> 값 + <b>16개마다 FP8(E4M3) 블록 스케일</b> + 텐서당 FP32 스케일 → 유효 4.5bit. Blackwell(B200/B300/GB200/GB300·RTX PRO 6000·RTX 50) FP4 텐서코어에서 하드웨어 가속되며, FP8에 근접한 정확도를 4-bit 크기로 냅니다. TensorRT-Model-Optimizer로 PTQ.</li>
-      <li><b>MXFP4</b> (OCP Microscaling): FP4 + <b>32개마다 E8M0 블록 스케일</b> → 유효 4.25bit. OpenAI <code>gpt-oss</code>의 기본 포맷. Blackwell/일부 최신 하드웨어에서 가속.</li>
-      <li><b>FP8</b> (E4M3/E5M2): 8-bit 부동소수. Hopper(H100/H200)·Blackwell 네이티브. 거의 무손실에 가까워 서빙 기본값으로 인기(가중치+KV+활성값 모두 FP8 가능).</li>
-      <li><b>INT4 계열 PTQ</b>: <b>GPTQ</b>(2차 헤시안 기반 반올림), <b>AWQ</b>(활성값-인지 채널 스케일), <b>AutoRound</b>, <b>HQQ</b>(캘리브레이션 없이 빠름), <b>bitsandbytes NF4</b>(QLoRA 학습용). <b>SmoothQuant</b>는 활성 이상치를 가중치로 이전해 INT8을 매끄럽게. <b>QuaRot·SpinQuant</b>는 회전으로 이상치를 눌러 4-bit 정확도를 끌어올림.</li>
-      <li><b>GGUF k-quants</b> (llama.cpp): <code>Q4_K_M</code>·<code>Q5_K_M</code>·<code>Q6_K</code> 등 블록·혼합정밀. Apple·CPU·소비자 GPU 자체호스팅의 사실상 표준. <code>Q4_K_M</code> ≈ 4.5bit로 NVFP4와 비슷한 크기.</li>
-      <li><b>더 낮은 비트</b>: INT2·<b>1.58-bit(BitNet)</b>·2-bit AQLM/QuIP# 도 있으나 정확도 손실이 커 대개 특수용도. 계산기는 다루지 않습니다.</li>
-      <li><b>주의</b>: 위 tok/s 이득은 <b>메모리 절감</b> 기준입니다. NVFP4/MXFP4는 <b>FP4 텐서코어가 있어야</b> 연산까지 가속되고(없으면 메모리 이득만), INT4는 Marlin 등 최적화 커널이 필요합니다. KV 캐시는 계산기가 FP16으로 잡지만 실제로는 FP8/INT8로도 줄일 수 있습니다.</li>
+      <li data-i18n-html="how.quant.li1"><b>bytes/param</b>: FP16·BF16 <code>2</code> · FP8·INT8 <code>1</code> · <b>NVFP4 <code>~0.5625</code></b>(4.5bit) · MXFP4 <code>~0.53125</code>(4.25bit) · INT4 <code>0.5</code>. 4-bit 포맷은 4비트 데이터에 <b>블록 스케일</b>이 붙어 정확히 0.5는 아닙니다 — 계산기는 이 오버헤드를 반영합니다.</li>
+      <li data-i18n-html="how.quant.li2"><b>NVFP4</b> (NVIDIA): FP4 <code>E2M1</code> 값 + <b>16개마다 FP8(E4M3) 블록 스케일</b> + 텐서당 FP32 스케일 → 유효 4.5bit. Blackwell(B200/B300/GB200/GB300·RTX PRO 6000·RTX 50) FP4 텐서코어에서 하드웨어 가속되며, FP8에 근접한 정확도를 4-bit 크기로 냅니다. TensorRT-Model-Optimizer로 PTQ.</li>
+      <li data-i18n-html="how.quant.li3"><b>MXFP4</b> (OCP Microscaling): FP4 + <b>32개마다 E8M0 블록 스케일</b> → 유효 4.25bit. OpenAI <code>gpt-oss</code>의 기본 포맷. Blackwell/일부 최신 하드웨어에서 가속.</li>
+      <li data-i18n-html="how.quant.li4"><b>FP8</b> (E4M3/E5M2): 8-bit 부동소수. Hopper(H100/H200)·Blackwell 네이티브. 거의 무손실에 가까워 서빙 기본값으로 인기(가중치+KV+활성값 모두 FP8 가능).</li>
+      <li data-i18n-html="how.quant.li5"><b>INT4 계열 PTQ</b>: <b>GPTQ</b>(2차 헤시안 기반 반올림), <b>AWQ</b>(활성값-인지 채널 스케일), <b>AutoRound</b>, <b>HQQ</b>(캘리브레이션 없이 빠름), <b>bitsandbytes NF4</b>(QLoRA 학습용). <b>SmoothQuant</b>는 활성 이상치를 가중치로 이전해 INT8을 매끄럽게. <b>QuaRot·SpinQuant</b>는 회전으로 이상치를 눌러 4-bit 정확도를 끌어올림.</li>
+      <li data-i18n-html="how.quant.li6"><b>GGUF k-quants</b> (llama.cpp): <code>Q4_K_M</code>·<code>Q5_K_M</code>·<code>Q6_K</code> 등 블록·혼합정밀. Apple·CPU·소비자 GPU 자체호스팅의 사실상 표준. <code>Q4_K_M</code> ≈ 4.5bit로 NVFP4와 비슷한 크기.</li>
+      <li data-i18n-html="how.quant.li7"><b>더 낮은 비트</b>: INT2·<b>1.58-bit(BitNet)</b>·2-bit AQLM/QuIP# 도 있으나 정확도 손실이 커 대개 특수용도. 계산기는 다루지 않습니다.</li>
+      <li data-i18n-html="how.quant.li8"><b>주의</b>: 위 tok/s 이득은 <b>메모리 절감</b> 기준입니다. NVFP4/MXFP4는 <b>FP4 텐서코어가 있어야</b> 연산까지 가속되고(없으면 메모리 이득만), INT4는 Marlin 등 최적화 커널이 필요합니다. KV 캐시는 계산기가 FP16으로 잡지만 실제로는 FP8/INT8로도 줄일 수 있습니다.</li>
     </ul>
   </details>
 </section>
 
 <footer>
-  <p>100% 클라이언트 사이드 · <a href="https://github.com/sylvanus4/llm-selfhost-calculator">GitHub</a> · MIT · 특정 벤더와 무관한 독립 도구. 수치는 공개 정보 기반 추정치입니다.</p>
+  <p data-i18n-html="footer">100% 클라이언트 사이드 · <a href="https://github.com/sylvanus4/llm-selfhost-calculator">GitHub</a> · MIT · 특정 벤더와 무관한 독립 도구. 수치는 공개 정보 기반 추정치입니다.</p>
 </footer>
 
+<script src="assets/i18n.js"></script>
 <script src="assets/compute.js"></script>
 <script src="assets/manifest.js"></script>
 <script src="assets/app.js"></script>

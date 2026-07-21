@@ -19,6 +19,8 @@ jobs:
         run: node test/spark.test.cjs
       - name: Unit test SGLang + TensorRT-LLM serving-readiness cores
         run: node test/engines.test.cjs
+      - name: Unit test i18n coverage (ko/en parity + no Korean leaks in EN)
+        run: node test/i18n.test.cjs
       - name: Validate generated manifests are well-formed YAML (vLLM + SGLang + TensorRT-LLM)
         run: |
           pip install --quiet pyyaml
@@ -49,9 +51,12 @@ jobs:
           for f in data/*.json; do node -e "JSON.parse(require('fs').readFileSync('$f'))" && echo "ok $f"; done
       - name: Sanity-check HTML wiring
         run: |
+          grep -q 'assets/i18n.js' index.html
           grep -q 'assets/compute.js' index.html
           grep -q 'assets/manifest.js' index.html
           grep -q 'assets/app.js' index.html
+          grep -q 'id="langToggle"' index.html
+          grep -q 'id="themeToggle"' index.html
           grep -q 'id="panelVllm"' index.html
           grep -q 'id="panelSglang"' index.html
           grep -q 'id="panelTrt"' index.html
