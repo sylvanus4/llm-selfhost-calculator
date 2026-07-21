@@ -17,19 +17,29 @@ jobs:
         run: node test/vllm.test.cjs
       - name: Unit test Spark per-node layout core (howtospark golden anchors)
         run: node test/spark.test.cjs
-      - name: Validate generated manifests are well-formed YAML
+      - name: Unit test SGLang + TensorRT-LLM serving-readiness cores
+        run: node test/engines.test.cjs
+      - name: Validate generated manifests are well-formed YAML (vLLM + SGLang + TensorRT-LLM)
         run: |
           pip install --quiet pyyaml
           node -e '
             const fs=require("fs");
-            const {buildServingSpec}=require("./assets/compute.js");
+            const {buildServingSpec,buildSglangSpec,buildTrtllmSpec}=require("./assets/compute.js");
             const M=require("./assets/manifest.js");
             const spec=buildServingSpec({modelId:"deepseek-ai/DeepSeek-V4-Pro",quant:"fp8",context:262144,modelMaxContext:1048576,concurrency:64,gpuCount:8,vllmVersion:"0.25.1"});
             fs.writeFileSync("/tmp/dc.yml",M.dockerCompose(spec));
             fs.writeFileSync("/tmp/k8s.yaml",M.k8sManifest(spec));
             fs.writeFileSync("/tmp/helm.yaml",M.helmValues(spec));
+            const sg=buildSglangSpec({modelId:"zai-org/GLM-5.2",quant:"fp8",context:65536,modelMaxContext:1048576,concurrency:64,gpuCount:8,version:"0.6.2",image:"lmsysorg/sglang:v0.6.2"});
+            fs.writeFileSync("/tmp/sg-dc.yml",M.engineCompose(sg));
+            fs.writeFileSync("/tmp/sg-k8s.yaml",M.engineK8s(sg));
+            fs.writeFileSync("/tmp/sg-helm.yaml",M.engineHelm(sg));
+            const trt=buildTrtllmSpec({modelId:"deepseek-ai/DeepSeek-V4-Pro",quant:"fp8",context:65536,modelMaxContext:1048576,concurrency:64,gpuCount:8,version:"1.2.0",image:"nvcr.io/nvidia/tensorrt-llm/release:1.2.0"});
+            fs.writeFileSync("/tmp/trt-dc.yml",M.engineCompose(trt));
+            fs.writeFileSync("/tmp/trt-k8s.yaml",M.engineK8s(trt));
+            fs.writeFileSync("/tmp/trt-helm.yaml",M.engineHelm(trt));
           '
-          python3 -c "import yaml; [list(yaml.safe_load_all(open(f))) for f in ['/tmp/dc.yml','/tmp/k8s.yaml','/tmp/helm.yaml']]; print('manifests parse as YAML')"
+          python3 -c "import yaml; [list(yaml.safe_load_all(open(f))) for f in ['/tmp/dc.yml','/tmp/k8s.yaml','/tmp/helm.yaml','/tmp/sg-dc.yml','/tmp/sg-k8s.yaml','/tmp/sg-helm.yaml','/tmp/trt-dc.yml','/tmp/trt-k8s.yaml','/tmp/trt-helm.yaml']]; print('manifests parse as YAML')"
       - name: Independent formula + cost audit (anchors + JS parity)
         run: |
           node audit/js_compute_dump.cjs > /tmp/js.json
@@ -43,6 +53,10 @@ jobs:
           grep -q 'assets/manifest.js' index.html
           grep -q 'assets/app.js' index.html
           grep -q 'id="panelVllm"' index.html
+          grep -q 'id="panelSglang"' index.html
+          grep -q 'id="panelTrt"' index.html
           grep -q 'id="panelSpark"' index.html
           grep -q 'data-panel="spark"' index.html
+          grep -q 'data-panel="sglang"' index.html
+          grep -q 'data-panel="trt"' index.html
           echo "html wiring ok"

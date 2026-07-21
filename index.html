@@ -3,8 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>LLM 자체호스팅 계산기 · VRAM·비용·vLLM 서빙 준비도 (docker-compose·K8s 매니페스트)</title>
-<meta name="description" content="이 LLM, 내 GPU/맥에서 돌아갈까? API보다 쌀까? vLLM에서 네이티브로 서빙되나? VRAM 적합성·토큰속도·손익분기 계산 + vLLM 지원 판정 + 바로 쓰는 docker-compose·Kubernetes 매니페스트 생성을 브라우저에서 즉시. 키 없음, 데이터 전송 없음.">
+<title>LLM 자체호스팅 계산기 · VRAM·비용·vLLM/SGLang/TensorRT-LLM 서빙 준비도 (docker-compose·K8s 매니페스트)</title>
+<meta name="description" content="이 LLM, 내 GPU/맥에서 돌아갈까? API보다 쌀까? vLLM·SGLang·TensorRT-LLM에서 네이티브로 서빙되나? VRAM 적합성·토큰속도·손익분기 계산 + 노드별 배치 + 세 엔진 서빙 지원 판정(모델·양자화·하드웨어별) + 바로 쓰는 docker-compose·Kubernetes 매니페스트 생성을 브라우저에서 즉시. 키 없음, 데이터 전송 없음.">
 <link rel="stylesheet" href="assets/style.css">
 </head>
 <body>
@@ -82,8 +82,10 @@
   <section class="panel results">
     <div class="tabs" id="resultTabs">
       <button type="button" class="tab active" data-panel="calc">비용 · 적합성</button>
-      <button type="button" class="tab" data-panel="vllm">vLLM 서빙 준비도</button>
       <button type="button" class="tab" data-panel="spark">노드별 배치</button>
+      <button type="button" class="tab" data-panel="vllm">vLLM 서빙 준비도</button>
+      <button type="button" class="tab" data-panel="sglang">SGLang 서빙 준비도</button>
+      <button type="button" class="tab" data-panel="trt">TensorRT-LLM 서빙 준비도</button>
     </div>
     <div id="panelCalc">
     <h2>결과 <span id="fitBadge"></span></h2>
@@ -132,6 +134,58 @@
       </div>
     </div><!-- /panelVllm -->
 
+    <div id="panelSglang" hidden>
+      <h2>SGLang 서빙 준비도 <span id="sglangBadge"></span></h2>
+      <div class="block">
+        <div class="block-title">판정</div>
+        <div id="sglangVerdictBox"></div>
+      </div>
+      <div class="block">
+        <div class="block-title">서빙 명령 (계산기 입력에서 도출)</div>
+        <div id="sglangParams"></div>
+      </div>
+      <div class="block">
+        <div class="block-title">배포 매니페스트</div>
+        <div class="tabs sub" id="sglangManifestTabs">
+          <button type="button" class="tab active" data-mf="compose">docker-compose</button>
+          <button type="button" class="tab" data-mf="k8s">Kubernetes</button>
+          <button type="button" class="tab" data-mf="helm">Helm</button>
+        </div>
+        <div class="mf-actions">
+          <button type="button" id="sglangMfCopy" class="fetch-btn">복사</button>
+          <button type="button" id="sglangMfDownload" class="fetch-btn">다운로드</button>
+          <span id="sglangMfStatus" class="dim"></span>
+        </div>
+        <pre class="code"><code id="sglangManifestCode"></code></pre>
+      </div>
+    </div><!-- /panelSglang -->
+
+    <div id="panelTrt" hidden>
+      <h2>TensorRT-LLM 서빙 준비도 <span id="trtBadge"></span></h2>
+      <div class="block">
+        <div class="block-title">판정</div>
+        <div id="trtVerdictBox"></div>
+      </div>
+      <div class="block">
+        <div class="block-title">서빙 명령 (계산기 입력에서 도출)</div>
+        <div id="trtParams"></div>
+      </div>
+      <div class="block">
+        <div class="block-title">배포 매니페스트</div>
+        <div class="tabs sub" id="trtManifestTabs">
+          <button type="button" class="tab active" data-mf="compose">docker-compose</button>
+          <button type="button" class="tab" data-mf="k8s">Kubernetes</button>
+          <button type="button" class="tab" data-mf="helm">Helm</button>
+        </div>
+        <div class="mf-actions">
+          <button type="button" id="trtMfCopy" class="fetch-btn">복사</button>
+          <button type="button" id="trtMfDownload" class="fetch-btn">다운로드</button>
+          <span id="trtMfStatus" class="dim"></span>
+        </div>
+        <pre class="code"><code id="trtManifestCode"></code></pre>
+      </div>
+    </div><!-- /panelTrt -->
+
     <div id="panelSpark" hidden>
       <h2>노드별 배치 <span id="sparkBadge"></span></h2>
       <div class="spark-model-head">
@@ -148,6 +202,10 @@
               <label><input type="radio" name="sparknodes" value="2" checked> 2×</label>
               <label><input type="radio" name="sparknodes" value="3"> 3×</label>
               <label><input type="radio" name="sparknodes" value="4"> 4×</label>
+              <label><input type="radio" name="sparknodes" value="8"> 8×</label>
+              <label><input type="radio" name="sparknodes" value="16"> 16×</label>
+              <label><input type="radio" name="sparknodes" value="36"> 36×</label>
+              <label><input type="radio" name="sparknodes" value="72"> 72×</label>
             </div>
           </div>
           <div class="cluster-ctl">

@@ -2,25 +2,32 @@
    Pure estimation core lives in compute.js (LLMCalc.compute), shared with the Node unit tests. */
 
 const compute = LLMCalc.compute;
-const state = { models: [], gpus: [], apiPresets: [], speech: null, vllm: null };
+const state = { models: [], gpus: [], apiPresets: [], speech: null, vllm: null, sglang: null, trtllm: null };
 
 // vLLM tab state: fetched = {id, config} for an arbitrary HF model (null = use curated dropdown);
 // manifests/spec cached from last render; active = which manifest tab is shown.
+// The single vllmState.fetched is shared by all three engine tabs.
 const vllmState = { fetched: null, spec: null, manifests: null, active: "compose" };
+const sglangState = { spec: null, manifests: null, active: "compose" };
+const trtState = { spec: null, manifests: null, active: "compose" };
 
 async function loadData() {
-  const [m, g, a, s, v] = await Promise.all([
+  const [m, g, a, s, v, sg, trt] = await Promise.all([
     fetch("data/models.json").then(r => r.json()),
     fetch("data/gpus.json").then(r => r.json()),
     fetch("data/api-prices.json").then(r => r.json()),
     fetch("data/speech.json").then(r => r.json()),
     fetch("data/vllm-support.json").then(r => r.json()),
+    fetch("data/sglang-support.json").then(r => r.json()),
+    fetch("data/trtllm-support.json").then(r => r.json()),
   ]);
   state.models = m.models;
   state.gpus = g.gpus;
   state.apiPresets = a.presets;
   state.speech = s;
   state.vllm = v;
+  state.sglang = sg;
+  state.trtllm = trt;
 }
 
 function fmt(x, d = 1) { return x == null || isNaN(x) ? "—" : Number(x).toLocaleString("en-US", { maximumFractionDigits: d }); }
@@ -153,6 +160,8 @@ function render() {
   if (context > model.context) el("modelNote").innerHTML += ` <span class="warn">⚠️ 선택 컨텍스트가 모델 최대(${model.context.toLocaleString()})를 초과</span>`;
 
   renderVllm(r);
+  renderSglang(r);
+  renderTrt(r);
   renderSpark(model, gpu, context);
 }
 
@@ -223,6 +232,94 @@ function renderVllm(r) {
 function renderManifest() {
   if (!vllmState.manifests) return;
   el("manifestCode").textContent = vllmState.manifests[vllmState.active] || "";
+}
+
+// ---- SGLang / TensorRT-LLM serving-readiness tabs -------------------------
+// Shared model/hardware resolution (curated dropdown OR fetched arbitrary HF model).
+function engineModelContext(r) {
+  const gpu = state.gpus.find(g => g.id === el("gpu").value);
+  const context = parseInt(el("context").value, 10);
+  if (vllmState.fetched) {
+    const cfg = vllmState.fetched.config;
+    return {
+      verdictInput: { config: cfg, id: vllmState.fetched.id },
+      modelId: vllmState.fetched.id,
+      modelMaxContext: cfg.max_position_embeddings || context,
+      gpuCount: 1,
+      custom: !!(cfg.auto_map || cfg.trust_remote_code),
+      quantMethod: (cfg.quantization_config && (cfg.quantization_config.quant_method || cfg.quantization_config.quant_algo)) || null,
+      vramNote: "임의 HF 모델 — 파라미터 수 미상이라 TP=1 기본(매니페스트에서 직접 조정).",
+      gpu,
+    };
+  }
+  const model = state.models.find(m => m.id === el("model").value);
+  return {
+    verdictInput: { curated: model }, modelId: model.hf, modelMaxContext: model.context,
+    gpuCount: r.gpusNeeded, custom: false, quantMethod: null, vramNote: "", gpu,
+  };
+}
+
+function renderEngineTab(o) {
+  const support = o.support;
+  if (!support) return;
+  const quant = el("quant").value;
+  const context = parseInt(el("context").value, 10);
+  const concurrency = parseInt(el("concurrency").value, 10);
+  const ctx = o.ctx;
+
+  const verdict = o.verdictFn(ctx.verdictInput, support, ctx.gpu);
+  const spec = o.specFn({
+    modelId: ctx.modelId, quant, context, modelMaxContext: ctx.modelMaxContext,
+    concurrency, gpuCount: ctx.gpuCount, version: support.version, image: support.image,
+    custom: ctx.custom, quantMethod: ctx.quantMethod,
+  });
+  o.state.spec = spec;
+  o.state.manifests = {
+    compose: Manifest.engineCompose(spec),
+    k8s: Manifest.engineK8s(spec),
+    helm: Manifest.engineHelm(spec),
+  };
+
+  const icon = verdict.ok ? "✅" : (verdict.tier === "incompatible" ? "⛔" : "⚠️");
+  el(o.ids.badge).innerHTML = `<span class="badge ${TIER_BADGE[verdict.tier] || "no"}">${icon} ${esc(verdict.label)}</span>`;
+
+  const help = (support.tier_help && support.tier_help[verdict.tier]) || "";
+  const caveats = (verdict.caveats || []).length
+    ? `<ul class="caveats">${verdict.caveats.map(c => `<li>${esc(c)}</li>`).join("")}</ul>` : "";
+  el(o.ids.verdict).innerHTML =
+    `<div><b>모델</b> <a href="https://huggingface.co/${esc(ctx.modelId)}" target="_blank" rel="noopener">${esc(ctx.modelId)}</a></div>` +
+    (verdict.arch ? `<div class="dim"><b>아키텍처</b> <code>${esc(verdict.arch)}</code></div>` : "") +
+    `<div class="dim"><b>하드웨어</b> ${esc(ctx.gpu ? ctx.gpu.name.split(" (")[0] : "—")}${ctx.gpuCount > 1 ? ` × ${ctx.gpuCount} (TP)` : ""}</div>` +
+    `<div class="dim"><b>기준 ${esc(o.engineLabel)}</b> v${esc(support.version)}${verdict.min_ver && verdict.min_ver !== support.version ? ` · 최소 v${esc(verdict.min_ver)}` : ""}</div>` +
+    (help ? `<div class="verdict ${verdict.ok ? "self" : "api"}">${esc(help)}</div>` : "") +
+    caveats +
+    (ctx.vramNote ? `<div class="dim warn" style="margin-top:6px">${esc(ctx.vramNote)}</div>` : "");
+
+  if (verdict.tier === "incompatible") {
+    el(o.ids.params).innerHTML = `<div class="dim warn">이 하드웨어에서는 ${esc(o.engineLabel)}을 실행할 수 없어 서빙 명령을 생성하지 않습니다.</div>`;
+  } else {
+    const cli = spec.command.join(" ").replace(/ --/g, " \\\n  --");
+    const quantWhatIf = (quant !== "fp16" && !vllmState.fetched)
+      ? `<div class="dim warn" style="margin-top:6px">⚠️ 양자화 플래그는 해당 양자화 체크포인트가 실제 존재할 때만 유효합니다 — 계산기의 양자화 선택은 VRAM "what-if"입니다.</div>`
+      : "";
+    el(o.ids.params).innerHTML = `<pre class="code small"><code>${esc(cli)}</code></pre>${quantWhatIf}`;
+  }
+  el(o.ids.manifestCode).textContent = o.state.manifests[o.state.active] || "";
+}
+
+function renderSglang(r) {
+  renderEngineTab({
+    engineLabel: "SGLang", support: state.sglang, ctx: engineModelContext(r),
+    verdictFn: LLMCalc.sglangVerdict, specFn: LLMCalc.buildSglangSpec, state: sglangState,
+    ids: { badge: "sglangBadge", verdict: "sglangVerdictBox", params: "sglangParams", manifestCode: "sglangManifestCode" },
+  });
+}
+function renderTrt(r) {
+  renderEngineTab({
+    engineLabel: "TensorRT-LLM", support: state.trtllm, ctx: engineModelContext(r),
+    verdictFn: LLMCalc.trtllmVerdict, specFn: LLMCalc.buildTrtllmSpec, state: trtState,
+    ids: { badge: "trtBadge", verdict: "trtVerdictBox", params: "trtParams", manifestCode: "trtManifestCode" },
+  });
 }
 
 // ---- Spark 배치 tab (howtospark.com-style per-node memory layout) ----------
@@ -313,7 +410,27 @@ function switchResultTab(which) {
   document.querySelectorAll("#resultTabs .tab").forEach(t => t.classList.toggle("active", t.dataset.panel === which));
   el("panelCalc").hidden = which !== "calc";
   el("panelVllm").hidden = which !== "vllm";
+  el("panelSglang").hidden = which !== "sglang";
+  el("panelTrt").hidden = which !== "trt";
   el("panelSpark").hidden = which !== "spark";
+}
+
+// Wire a manifest sub-tab group (SGLang / TensorRT-LLM) — sub-tab switch + copy + download.
+function wireEngineManifest(o) {
+  document.querySelectorAll(o.tabsSel + " .tab").forEach(t =>
+    t.addEventListener("click", () => {
+      o.state.active = t.dataset.mf;
+      document.querySelectorAll(o.tabsSel + " .tab").forEach(x => x.classList.toggle("active", x === t));
+      el(o.codeId).textContent = (o.state.manifests || {})[o.state.active] || "";
+    }));
+  el(o.copyId).addEventListener("click", async () => {
+    const text = (o.state.manifests || {})[o.state.active] || "";
+    try { await navigator.clipboard.writeText(text); el(o.statusId).textContent = "복사됨"; }
+    catch (e) { el(o.statusId).textContent = "복사 실패 — 코드를 직접 선택하세요"; }
+    setTimeout(() => { el(o.statusId).textContent = ""; }, 2000);
+  });
+  el(o.downloadId).addEventListener("click", () =>
+    downloadText(o.filenames[o.state.active] || "manifest.txt", (o.state.manifests || {})[o.state.active] || ""));
 }
 
 function normalizeAndRoute() {
@@ -475,6 +592,18 @@ async function init() {
   el("mfDownload").addEventListener("click", () => {
     const names = { compose: "docker-compose.yml", k8s: "vllm-deployment.yaml", helm: "values.yaml" };
     downloadText(names[vllmState.active] || "manifest.txt", (vllmState.manifests || {})[vllmState.active] || "");
+  });
+
+  // SGLang / TensorRT-LLM manifest sub-tabs
+  wireEngineManifest({
+    tabsSel: "#sglangManifestTabs", state: sglangState, codeId: "sglangManifestCode",
+    copyId: "sglangMfCopy", downloadId: "sglangMfDownload", statusId: "sglangMfStatus",
+    filenames: { compose: "docker-compose.yml", k8s: "sglang-deployment.yaml", helm: "values.yaml" },
+  });
+  wireEngineManifest({
+    tabsSel: "#trtManifestTabs", state: trtState, codeId: "trtManifestCode",
+    copyId: "trtMfCopy", downloadId: "trtMfDownload", statusId: "trtMfStatus",
+    filenames: { compose: "docker-compose.yml", k8s: "trtllm-deployment.yaml", helm: "values.yaml" },
   });
 
   render();
