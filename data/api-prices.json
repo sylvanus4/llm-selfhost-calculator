@@ -4,7 +4,7 @@
   "presets": [
     {"label": "Hosted 8B-class (e.g. Llama/Qwen 8B)", "provider": "Open (hosted)", "usd_per_1m": 0.18},
     {"label": "Hosted 30–70B-class (e.g. Qwen3.6-27B / Llama 70B)", "provider": "Open (hosted)", "usd_per_1m": 0.80},
-    {"label": "Hosted open MoE frontier (DeepSeek-V4 / Kimi급)", "provider": "Open (hosted)", "usd_per_1m": 0.55},
+    {"label": "Hosted open MoE frontier (DeepSeek-V4 / Kimi-class)", "provider": "Open (hosted)", "usd_per_1m": 0.55},
     {"label": "Claude Haiku 4.5", "provider": "Anthropic", "input": 1.00, "output": 5.00, "usd_per_1m": 2.00},
     {"label": "Claude Sonnet 5", "provider": "Anthropic", "input": 3.00, "output": 15.00, "usd_per_1m": 6.00},
     {"label": "Claude Opus 4.8", "provider": "Anthropic", "input": 5.00, "output": 25.00, "usd_per_1m": 10.00},

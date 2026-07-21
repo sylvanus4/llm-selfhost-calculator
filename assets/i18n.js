@@ -437,6 +437,12 @@
     "텍스트 입력 / 오디오 출력": "text in / audio out",
     "STT $0.10/시간 · S2S $0.05/분": "STT $0.10/hr · S2S $0.05/min",
     "크레딧 기반 환산 [추정]": "credit-based conversion [est.]",
+    // speech.json units
+    "/이미지": "/image",
+    "/1M 오디오 tok": "/1M audio tok",
+    "/분": "/min",
+    "/시간": "/hr",
+    "/1M자": "/1M chars",
   };
 
   let lang = "ko";

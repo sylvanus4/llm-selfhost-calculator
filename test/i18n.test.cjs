@@ -48,7 +48,16 @@ for (const f of ["vllm-support", "sglang-support", "trtllm-support"]) {
   if (d.hardware && d.hardware.note) surface.add(d.hardware.note);
 }
 const speech = JSON.parse(fs.readFileSync(path.join(root, "data/speech.json")));
-for (const k of ["image", "selfhost", "api"]) (speech[k] || []).forEach(x => { if (x.note && /[가-힣]/.test(x.note)) surface.add(x.note); });
+for (const k of ["image", "selfhost", "api"]) (speech[k] || []).forEach(x => {
+  ["note", "unit", "params", "vram"].forEach(f => { if (x[f] && /[가-힣]/.test(x[f])) surface.add(x[f]); });
+});
+
+// api-prices preset labels/notes render in a dropdown that is NOT re-rendered on toggle,
+// so they must be language-neutral (no Korean) rather than DATA-translated.
+const apiPrices = JSON.parse(fs.readFileSync(path.join(root, "data/api-prices.json")));
+const apiKo = (apiPrices.presets || []).filter(p => /[가-힣]/.test(JSON.stringify(p)));
+ok("no Korean in api-prices preset labels (dropdown isn't re-translated)", apiKo.length === 0);
+if (apiKo.length) apiKo.forEach(p => console.log("      - " + p.label));
 
 const dataMiss = [...surface].filter(s => !dataKeys.has(s));
 ok("every surfaced data string has an EN translation (" + surface.size + " strings)", dataMiss.length === 0);
