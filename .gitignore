@@ -5,3 +5,6 @@ __pycache__/
 .DS_Store
 out/
 .venv/
+
+# runtime drift-check report (regenerated each run)
+audit/engine-version-report.json
