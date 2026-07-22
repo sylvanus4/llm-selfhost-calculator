@@ -25,6 +25,8 @@ jobs:
         run: node test/versions-tools.test.cjs
       - name: Unit test new-model builder (offline fixtures, no fabrication)
         run: node test/add-model.test.cjs
+      - name: Health audit (structural — no error-severity problems)
+        run: node test/health-audit.test.cjs
       - name: Validate generated manifests are well-formed YAML (vLLM + SGLang + TensorRT-LLM)
         run: |
           pip install --quiet pyyaml

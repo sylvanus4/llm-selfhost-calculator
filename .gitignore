@@ -8,3 +8,4 @@ out/
 
 # runtime drift-check report (regenerated each run)
 audit/engine-version-report.json
+audit/health-report.json
