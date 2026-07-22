@@ -2,7 +2,7 @@
   "_note": "SGLang 서빙 준비도 판정 근거. arch_support = 모델의 HF config.json architectures[] 대표 문자열 → SGLang 지원 등급 매핑(전수 아님 — 매칭되면 高신뢰, 미매칭이라고 완전 미지원은 아님). SGLang은 vLLM과 달리 python 모델 파일 레지스트리(sglang/srt/models) 기반이라, 레지스트리에 있으면 native. DeepSeek/MLA + DP-attention은 SGLang의 대표 강점 경로. 하이브리드 Mamba-2(NemotronH/GraniteMoeHybrid)와 신규 MoE는 vLLM보다 뒤늦게 들어와 partial로 본다. hardware = SGLang은 NVIDIA(CUDA)·AMD(ROCm)에서 돌고 Apple/NPU는 미지원. quant_methods = --quantization 플래그로 받는 체크포인트 양자화 포맷. 이 파일은 SGLang 릴리스마다 갱신한다(version 핀). 출처: SGLang supported_models 문서 + 릴리스 노트(2026-07). 모든 등급은 계획용 근사 — 실측 벤치 권장.",
   "_updated": "2026-07-21",
   "version": "0.6.2",
-  "docs": "https://docs.sglang.ai/references/supported_models.html",
+  "docs": "https://docs.sglang.ai/supported_models.html",
   "image": "lmsysorg/sglang:v0.6.2",
   "default_port": 30000,
   "hardware": {
@@ -56,7 +56,7 @@
       "version": "0.6",
       "latest_patch": "0.6.2",
       "released": "2026-07",
-      "docs": "https://docs.sglang.ai/references/supported_models.html",
+      "docs": "https://docs.sglang.ai/supported_models.html",
       "highlights": [
         {"ko": "DeepSeek V4 압축 KV/희소 인덱서 경로 · GLM MoE DSA 어텐션 · 하이브리드 Mamba-2(NemotronH/Granite) partial 지원", "en": "DeepSeek V4 compressed-KV / sparse-indexer path · GLM MoE DSA attention · partial hybrid Mamba-2 (NemotronH/Granite)"},
         {"ko": "툴 콜링 파서 deepseekv3·glm45·qwen3_coder·kimi_k2 · reasoning 파서(qwen3·glm45·gpt-oss)", "en": "Tool-call parsers deepseekv3, glm45, qwen3_coder, kimi_k2 · reasoning parsers (qwen3, glm45, gpt-oss)"},
@@ -68,7 +68,7 @@
       "version": "0.5",
       "latest_patch": "0.5.3",
       "released": "2026-04",
-      "docs": "https://docs.sglang.ai/references/supported_models.html",
+      "docs": "https://docs.sglang.ai/supported_models.html",
       "highlights": [
         {"ko": "Llama 4·Qwen3 VL 멀티모달 경로 · RadixAttention 캐시 재사용 개선", "en": "Llama 4 / Qwen3-VL multimodal paths · improved RadixAttention cache reuse"},
         {"ko": "FP8/W8A8 INT8 서빙 안정화 · 연속 배칭 스케줄러 개선", "en": "FP8 / W8A8-INT8 serving stabilized · continuous-batching scheduler improvements"},
@@ -80,7 +80,7 @@
       "version": "0.4",
       "latest_patch": "0.4.9",
       "released": "2026-01",
-      "docs": "https://docs.sglang.ai/references/supported_models.html",
+      "docs": "https://docs.sglang.ai/supported_models.html",
       "highlights": [
         {"ko": "DeepSeek V3 MLA + DP-attention 대표 경로 확립 · Qwen2.5/Qwen3 등록", "en": "Established DeepSeek V3 MLA + DP-attention flagship path · Qwen2.5/Qwen3 registered"},
         {"ko": "초기 함수호출 파서(qwen25·llama3) · 구조화 출력(xgrammar)", "en": "Initial function-call parsers (qwen25, llama3) · structured outputs (xgrammar)"},
