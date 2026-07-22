@@ -1,0 +1,10 @@
+{
+  "architectures": ["Qwen3ForCausalLM"],
+  "num_hidden_layers": 48,
+  "hidden_size": 5120,
+  "num_attention_heads": 40,
+  "num_key_value_heads": 8,
+  "head_dim": 128,
+  "max_position_embeddings": 262144,
+  "license": "apache-2.0"
+}

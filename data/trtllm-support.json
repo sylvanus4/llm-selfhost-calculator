@@ -1,9 +1,9 @@
 {
   "_note": "TensorRT-LLM 서빙 준비도 판정 근거. arch_support = 모델의 HF config.json architectures[] 대표 문자열 → TensorRT-LLM 지원 등급 매핑(전수 아님). ⚠️ 하드웨어: TensorRT-LLM은 NVIDIA GPU 전용 — AMD·Apple·NPU에서는 아예 동작하지 않는다(그 경우 tier=incompatible). NVIDIA 자사 스택이라 DeepSeek V3/GPT-OSS/Nemotron은 FP8/NVFP4로 강하게 최적화. 최신 릴리스는 PyTorch 백엔드(trtllm-serve)로 사전 엔진 빌드 없이 서빙 가능 — 예전 ahead-of-time 엔진 빌드보다 간편. 양자화는 TensorRT-Model-Optimizer로 사전 양자화한 체크포인트(FP8/NVFP4/INT4-AWQ)를 쓰는 게 정석. 이 파일은 TensorRT-LLM 릴리스마다 갱신한다(version 핀). 출처: NVIDIA/TensorRT-LLM support matrix + 릴리스 노트(2026-07). 모든 등급은 계획용 근사 — 실측 벤치 권장.",
-  "_updated": "2026-07-21",
-  "version": "1.2.0",
+  "_updated": "2026-07-22",
+  "version": "1.2.1",
   "docs": "https://nvidia.github.io/TensorRT-LLM/reference/support-matrix.html",
-  "image": "nvcr.io/nvidia/tensorrt-llm/release:1.2.0",
+  "image": "nvcr.io/nvidia/tensorrt-llm/release:1.2.1",
   "default_port": 8000,
   "hardware": {
     "supported_kinds": ["gpu"],
@@ -51,7 +51,7 @@
   "versions": [
     {
       "version": "1.2",
-      "latest_patch": "1.2.0",
+      "latest_patch": "1.2.1",
       "released": "2026-07",
       "docs": "https://nvidia.github.io/TensorRT-LLM/reference/support-matrix.html",
       "highlights": [
