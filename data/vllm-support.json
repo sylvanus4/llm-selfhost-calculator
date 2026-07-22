@@ -50,6 +50,80 @@
     "ExaoneForCausalLM",
     "Exaone4ForCausalLM"
   ],
+  "versions": [
+    {
+      "version": "0.25",
+      "latest_patch": "0.25.1",
+      "released": "2026-07",
+      "docs": "https://docs.vllm.ai/en/latest/models/supported_models/",
+      "highlights": [
+        {"ko": "DeepSeek V4 / DSA 희소 어텐션 · NemotronH·GraniteMoeHybrid 하이브리드 Mamba-2 경로 정식 지원", "en": "DeepSeek V4 / DSA sparse attention · first-class hybrid Mamba-2 paths for NemotronH and GraniteMoeHybrid"},
+        {"ko": "툴 콜링 파서 deepseek_v3·glm45·qwen3_coder·kimi_k2 추가, reasoning 파서 확장(qwen3·gpt_oss·glm45)", "en": "New tool-call parsers deepseek_v3, glm45, qwen3_coder, kimi_k2; expanded reasoning parsers (qwen3, gpt_oss, glm45)"},
+        {"ko": "MXFP4(gpt-oss) 커널 안정화 · Blackwell FP4 경로 개선", "en": "MXFP4 (gpt-oss) kernel stabilized · improved Blackwell FP4 path"}
+      ],
+      "notable_flags": ["--tool-call-parser", "--reasoning-parser", "--enable-auto-tool-choice", "--quantization mxfp4", "--kv-cache-dtype fp8"]
+    },
+    {
+      "version": "0.24",
+      "latest_patch": "0.24.2",
+      "released": "2026-05",
+      "docs": "https://docs.vllm.ai/en/v0.24.0/models/supported_models/",
+      "highlights": [
+        {"ko": "Llama 4 멀티모달·Gemma 3 conditional 경로 · MLA(DeepSeek/Kimi) 디코딩 최적화", "en": "Llama 4 multimodal · Gemma 3 conditional path · MLA (DeepSeek/Kimi) decode optimizations"},
+        {"ko": "FP8 KV 캐시 기본 경로 정착 · MiniMax 계열 등록", "en": "FP8 KV-cache path matured · MiniMax family registered"},
+        {"ko": "구조화 출력(structured outputs)·guided decoding 안정화", "en": "Structured outputs / guided decoding stabilized"}
+      ],
+      "notable_flags": ["--tool-call-parser", "--enable-auto-tool-choice", "--kv-cache-dtype fp8", "--guided-decoding-backend"]
+    },
+    {
+      "version": "0.23",
+      "latest_patch": "0.23.3",
+      "released": "2026-03",
+      "docs": "https://docs.vllm.ai/en/v0.23.0/models/supported_models/",
+      "highlights": [
+        {"ko": "Qwen3 MoE·GLM-4 MoE 네이티브 등록 · EAGLE/MTP 추측 디코딩", "en": "Qwen3 MoE / GLM-4 MoE natively registered · EAGLE/MTP speculative decoding"},
+        {"ko": "초기 툴 콜링 파서(hermes·llama3_json·mistral) + --enable-auto-tool-choice", "en": "Initial tool-call parsers (hermes, llama3_json, mistral) + --enable-auto-tool-choice"},
+        {"ko": "AWQ/GPTQ Marlin 커널 · compressed-tensors 로더", "en": "AWQ/GPTQ Marlin kernels · compressed-tensors loader"}
+      ],
+      "notable_flags": ["--tool-call-parser hermes", "--enable-auto-tool-choice", "--speculative-config", "--quantization awq"]
+    }
+  ],
+  "tool_calling": {
+    "_note": "vLLM 툴 콜링은 --enable-auto-tool-choice + --tool-call-parser <parser>가 필요하고, thinking/reasoning 모델은 --reasoning-parser <parser>를 함께 줍니다. 일부 모델은 tool용 chat_template를 별도로 지정해야 합니다. parser 이름은 vLLM 릴리스마다 추가/변경됩니다 — 최신 문서 확인.",
+    "_default": {"tool_parser": null, "reasoning_parser": null, "note": {"ko": "이 아키텍처의 네이티브 툴 파서는 미확인입니다 — 모델 카드의 chat_template와 vLLM 문서에서 --tool-call-parser 값을 확인하세요(대개 hermes 또는 pythonic).", "en": "No confirmed native tool parser for this architecture — check the model card's chat_template and the vLLM docs for the --tool-call-parser value (often hermes or pythonic)."}},
+    "LlamaForCausalLM": {"tool_parser": "llama3_json", "reasoning_parser": null},
+    "Llama4ForConditionalGeneration": {"tool_parser": "llama4_pythonic", "reasoning_parser": null},
+    "MistralForCausalLM": {"tool_parser": "mistral", "reasoning_parser": null, "note": {"ko": "Mistral 툴 템플릿 권장 — --tool-call-parser mistral (mistral_common 토크나이저 사용 시 정확도↑).", "en": "Prefer the Mistral tool template — --tool-call-parser mistral (more accurate with the mistral_common tokenizer)."}},
+    "MixtralForCausalLM": {"tool_parser": "mistral", "reasoning_parser": null},
+    "Qwen2ForCausalLM": {"tool_parser": "hermes", "reasoning_parser": null},
+    "Qwen2MoeForCausalLM": {"tool_parser": "hermes", "reasoning_parser": null},
+    "Qwen3ForCausalLM": {"tool_parser": "hermes", "reasoning_parser": "qwen3", "note": {"ko": "Qwen3 thinking 모드는 --reasoning-parser qwen3 필요. 코더 변형은 --tool-call-parser qwen3_coder.", "en": "Qwen3 thinking mode needs --reasoning-parser qwen3. Coder variants use --tool-call-parser qwen3_coder."}},
+    "Qwen3MoeForCausalLM": {"tool_parser": "hermes", "reasoning_parser": "qwen3", "note": {"ko": "코더 변형(Qwen3-Coder)은 --tool-call-parser qwen3_coder 사용.", "en": "Coder variants (Qwen3-Coder) use --tool-call-parser qwen3_coder."}},
+    "Qwen3VLForConditionalGeneration": {"tool_parser": "hermes", "reasoning_parser": "qwen3"},
+    "Qwen2VLForConditionalGeneration": {"tool_parser": "hermes", "reasoning_parser": null},
+    "DeepseekV2ForCausalLM": {"tool_parser": "deepseek_v3", "reasoning_parser": "deepseek_r1"},
+    "DeepseekV3ForCausalLM": {"tool_parser": "deepseek_v3", "reasoning_parser": "deepseek_r1", "note": {"ko": "DeepSeek V3/R1 계열 — 툴은 deepseek_v3, reasoning은 deepseek_r1 파서.", "en": "DeepSeek V3/R1 family — deepseek_v3 for tools, deepseek_r1 for reasoning."}},
+    "DeepseekV4ForCausalLM": {"tool_parser": "deepseek_v3", "reasoning_parser": "deepseek_r1", "note": {"ko": "V4도 V3 계열 파서를 재사용(툴 deepseek_v3 · reasoning deepseek_r1). vLLM 0.25+에서 확인.", "en": "V4 reuses the V3-family parsers (tool deepseek_v3 · reasoning deepseek_r1). Verify on vLLM 0.25+."}},
+    "GlmForCausalLM": {"tool_parser": "glm45", "reasoning_parser": "glm45"},
+    "Glm4ForCausalLM": {"tool_parser": "glm45", "reasoning_parser": "glm45"},
+    "Glm4MoeForCausalLM": {"tool_parser": "glm45", "reasoning_parser": "glm45", "note": {"ko": "GLM-4.5/5.x MoE — --tool-call-parser glm45 · --reasoning-parser glm45.", "en": "GLM-4.5/5.x MoE — --tool-call-parser glm45 · --reasoning-parser glm45."}},
+    "GptOssForCausalLM": {"tool_parser": "openai", "reasoning_parser": "gpt_oss", "note": {"ko": "gpt-oss는 Harmony 포맷 — --tool-call-parser openai · --reasoning-parser gpt_oss(추론 레벨 노출).", "en": "gpt-oss uses the Harmony format — --tool-call-parser openai · --reasoning-parser gpt_oss (exposes reasoning level)."}},
+    "MiniMaxText01ForCausalLM": {"tool_parser": "minimax", "reasoning_parser": null},
+    "MiniMaxM2ForCausalLM": {"tool_parser": "minimax", "reasoning_parser": "minimax_m2", "note": {"ko": "MiniMax M2 — 툴 minimax · reasoning minimax_m2(interleaved thinking).", "en": "MiniMax M2 — tool minimax · reasoning minimax_m2 (interleaved thinking)."}},
+    "GraniteForCausalLM": {"tool_parser": "granite", "reasoning_parser": "granite"},
+    "GraniteMoeForCausalLM": {"tool_parser": "granite", "reasoning_parser": "granite"},
+    "GraniteMoeHybridForCausalLM": {"tool_parser": "granite", "reasoning_parser": "granite"},
+    "NemotronForCausalLM": {"tool_parser": "hermes", "reasoning_parser": null, "note": {"ko": "Nemotron은 전용 파서가 없어 hermes 템플릿으로 시도 — 실측 권장.", "en": "Nemotron has no dedicated parser; try the hermes template — testing recommended."}},
+    "NemotronHForCausalLM": {"tool_parser": "hermes", "reasoning_parser": null, "note": {"ko": "하이브리드 Nemotron H — hermes 템플릿 시도, 실측 권장.", "en": "Hybrid Nemotron H — try the hermes template, testing recommended."}},
+    "InternLM2ForCausalLM": {"tool_parser": "internlm", "reasoning_parser": null},
+    "JambaForCausalLM": {"tool_parser": "jamba", "reasoning_parser": null},
+    "CohereForCausalLM": {"tool_parser": "pythonic", "reasoning_parser": null},
+    "Cohere2ForCausalLM": {"tool_parser": "pythonic", "reasoning_parser": null},
+    "Phi3ForCausalLM": {"tool_parser": "phi4_mini_json", "reasoning_parser": null, "note": {"ko": "Phi 계열 툴 파서는 제한적 — phi4_mini_json 시도 또는 커스텀 템플릿.", "en": "Phi tool parsers are limited — try phi4_mini_json or a custom template."}},
+    "Gemma3ForCausalLM": {"tool_parser": "pythonic", "reasoning_parser": null, "note": {"ko": "Gemma는 네이티브 툴 파서가 없어 pythonic 또는 커스텀 chat_template로 함수호출을 구현합니다.", "en": "Gemma has no native tool parser — implement function calling via pythonic or a custom chat_template."}},
+    "Gemma4ForCausalLM": {"tool_parser": "pythonic", "reasoning_parser": null, "note": {"ko": "Gemma 4도 네이티브 파서 없음 — pythonic/커스텀 템플릿.", "en": "Gemma 4 also lacks a native parser — pythonic / custom template."}},
+    "Gemma4ForConditionalGeneration": {"tool_parser": "pythonic", "reasoning_parser": null, "note": {"ko": "Gemma 4 멀티모달 — 툴은 텍스트 경로에서 pythonic/커스텀 템플릿.", "en": "Gemma 4 multimodal — tools via pythonic / custom template on the text path."}}
+  },
   "quant_methods": {
     "awq": "AWQ (4-bit, activation-aware). Marlin 커널로 가속.",
     "gptq": "GPTQ (4/8-bit, Hessian PTQ). Marlin 커널.",

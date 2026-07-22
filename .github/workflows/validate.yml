@@ -21,6 +21,8 @@ jobs:
         run: node test/engines.test.cjs
       - name: Unit test i18n coverage (ko/en parity + no Korean leaks in EN)
         run: node test/i18n.test.cjs
+      - name: Unit test engine version-history + per-model tool-calling schema
+        run: node test/versions-tools.test.cjs
       - name: Validate generated manifests are well-formed YAML (vLLM + SGLang + TensorRT-LLM)
         run: |
           pip install --quiet pyyaml

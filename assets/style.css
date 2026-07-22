@@ -221,3 +221,14 @@ select, input[type=text] { max-width: 100%; }
   .segmented { flex-wrap: wrap; }
   .segmented label { flex: 1 1 46%; }
 }
+
+/* engine version history + tool-calling blocks (readiness tabs) */
+.versions { display: grid; gap: 8px; }
+.ver-card { border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px; background: var(--panel2); }
+.ver-card.cur { border-color: color-mix(in srgb, var(--ok) 45%, var(--border)); }
+.ver-head { font-size: 13px; }
+.ver-head b { font-family: var(--mono); color: var(--text); }
+.ver-hi { margin: 6px 0 0; padding-left: 18px; font-size: 12.5px; color: var(--dim); }
+.ver-hi li { margin: 2px 0; }
+.ver-flags { margin-top: 6px; font-size: 11.5px; }
+.ver-flags code, .ver-head code { font-family: var(--mono); background: color-mix(in srgb, var(--accent) 10%, transparent); padding: 1px 5px; border-radius: 4px; }

@@ -48,6 +48,67 @@
     "InternLM2ForCausalLM": {"tier": "native"},
     "Starcoder2ForCausalLM": {"tier": "native"}
   },
+  "versions": [
+    {
+      "version": "1.2",
+      "latest_patch": "1.2.0",
+      "released": "2026-07",
+      "docs": "https://nvidia.github.io/TensorRT-LLM/reference/support-matrix.html",
+      "highlights": [
+        {"ko": "DeepSeek V4 압축 KV/희소 인덱서 · GLM MoE partial · NVFP4(Blackwell) 경로 성숙", "en": "DeepSeek V4 compressed-KV / sparse indexer · GLM MoE partial · matured NVFP4 (Blackwell) path"},
+        {"ko": "trtllm-serve(PyTorch 백엔드) OpenAI 호환 API에 --tool_call_parser 추가(hermes·llama3_json·deepseek_v3·harmony)", "en": "trtllm-serve (PyTorch backend) OpenAI-compatible API adds --tool_call_parser (hermes, llama3_json, deepseek_v3, harmony)"},
+        {"ko": "GraniteMoeHybrid partial · Qwen3 MoE 등록(1.1+)", "en": "GraniteMoeHybrid partial · Qwen3 MoE registered (1.1+)"}
+      ],
+      "notable_flags": ["--tool_call_parser", "--backend pytorch", "--kv_cache_dtype fp8", "--tp_size"]
+    },
+    {
+      "version": "1.1",
+      "latest_patch": "1.1.0",
+      "released": "2026-04",
+      "docs": "https://nvidia.github.io/TensorRT-LLM/reference/support-matrix.html",
+      "highlights": [
+        {"ko": "PyTorch 백엔드(trtllm-serve) 사전 엔진 빌드 제거 · Qwen3 MoE·NemotronH 등록", "en": "PyTorch backend (trtllm-serve) removes ahead-of-time engine build · Qwen3 MoE / NemotronH registered"},
+        {"ko": "NVFP4(ModelOpt) 서빙 경로 · FP8 KV 캐시 안정화", "en": "NVFP4 (ModelOpt) serving path · FP8 KV-cache stabilized"},
+        {"ko": "초기 OpenAI 호환 툴 콜링(hermes·llama3_json)", "en": "Initial OpenAI-compatible tool calling (hermes, llama3_json)"}
+      ],
+      "notable_flags": ["--backend pytorch", "--tool_call_parser hermes", "--kv_cache_dtype fp8"]
+    },
+    {
+      "version": "1.0",
+      "latest_patch": "1.0.0",
+      "released": "2026-01",
+      "docs": "https://nvidia.github.io/TensorRT-LLM/reference/support-matrix.html",
+      "highlights": [
+        {"ko": "1.0 GA — DeepSeek V3 FP8/NVFP4 대표 최적화 · Llama/Qwen2 엔진 빌드 경로", "en": "1.0 GA — DeepSeek V3 FP8/NVFP4 flagship optimization · Llama/Qwen2 engine-build path"},
+        {"ko": "INT4-AWQ·INT8-SQ(ModelOpt) 사전 양자화 체크포인트", "en": "INT4-AWQ / INT8-SQ (ModelOpt) pre-quantized checkpoints"},
+        {"ko": "in-flight 배칭 · paged KV 캐시", "en": "in-flight batching · paged KV cache"}
+      ],
+      "notable_flags": ["--kv_cache_dtype fp8", "--tp_size", "--max_batch_size"]
+    }
+  ],
+  "tool_calling": {
+    "_note": "TensorRT-LLM 툴 콜링은 최신 trtllm-serve(PyTorch 백엔드)의 OpenAI 호환 API에서 --tool_call_parser로 지원되며 vLLM/SGLang보다 커버리지가 좁습니다. reasoning 파서 노출은 제한적 — 대개 chat_template로 처리. 미확인 아키텍처는 실측 필요.",
+    "_default": {"tool_parser": null, "reasoning_parser": null, "note": {"ko": "이 아키텍처의 TensorRT-LLM 툴 파서는 미확인 — trtllm-serve OpenAI API 문서와 모델 chat_template를 확인하세요(vLLM/SGLang이 더 넓게 지원).", "en": "No confirmed TensorRT-LLM tool parser for this architecture — check the trtllm-serve OpenAI API docs and the model chat_template (vLLM/SGLang cover more)."}},
+    "LlamaForCausalLM": {"tool_parser": "llama3_json", "reasoning_parser": null},
+    "Llama4ForConditionalGeneration": {"tool_parser": "llama3_json", "reasoning_parser": null},
+    "MistralForCausalLM": {"tool_parser": "mistral", "reasoning_parser": null},
+    "MixtralForCausalLM": {"tool_parser": "mistral", "reasoning_parser": null},
+    "Qwen2ForCausalLM": {"tool_parser": "hermes", "reasoning_parser": null},
+    "Qwen2MoeForCausalLM": {"tool_parser": "hermes", "reasoning_parser": null},
+    "Qwen3ForCausalLM": {"tool_parser": "hermes", "reasoning_parser": null, "note": {"ko": "Qwen3 — hermes 파서. thinking 노출은 chat_template 처리(TRT-LLM reasoning 파서 제한적).", "en": "Qwen3 — hermes parser. Thinking exposure via chat_template (TRT-LLM reasoning parser is limited)."}},
+    "Qwen3MoeForCausalLM": {"tool_parser": "hermes", "reasoning_parser": null},
+    "DeepseekV2ForCausalLM": {"tool_parser": "deepseek_v3", "reasoning_parser": null},
+    "DeepseekV3ForCausalLM": {"tool_parser": "deepseek_v3", "reasoning_parser": null, "note": {"ko": "DeepSeek V3 — --tool_call_parser deepseek_v3. reasoning은 chat_template 경로.", "en": "DeepSeek V3 — --tool_call_parser deepseek_v3. Reasoning via chat_template."}},
+    "DeepseekV4ForCausalLM": {"tool_parser": "deepseek_v3", "reasoning_parser": null},
+    "GptOssForCausalLM": {"tool_parser": "harmony", "reasoning_parser": null, "note": {"ko": "gpt-oss — Harmony 포맷(--tool_call_parser harmony). NVIDIA 협업 최적화.", "en": "gpt-oss — Harmony format (--tool_call_parser harmony). NVIDIA-collaborated optimization."}},
+    "NemotronForCausalLM": {"tool_parser": "hermes", "reasoning_parser": null, "note": {"ko": "NVIDIA 자사 — hermes 템플릿, 우선 지원.", "en": "NVIDIA's own — hermes template, first-class support."}},
+    "NemotronHForCausalLM": {"tool_parser": "hermes", "reasoning_parser": null},
+    "Glm4MoeForCausalLM": {"tool_parser": null, "reasoning_parser": null, "note": {"ko": "GLM MoE — TRT-LLM 툴 파서 미확인(partial 지원), chat_template/실측 필요.", "en": "GLM MoE — no confirmed TRT-LLM tool parser (partial support), needs chat_template / testing."}},
+    "GraniteForCausalLM": {"tool_parser": "hermes", "reasoning_parser": null},
+    "Gemma3ForCausalLM": {"tool_parser": null, "reasoning_parser": null, "note": {"ko": "Gemma — 네이티브 파서 없음, 커스텀 chat_template.", "en": "Gemma — no native parser, custom chat_template."}},
+    "Gemma4ForCausalLM": {"tool_parser": null, "reasoning_parser": null, "note": {"ko": "Gemma 4 — 커스텀 chat_template 필요.", "en": "Gemma 4 — needs a custom chat_template."}},
+    "Gemma4ForConditionalGeneration": {"tool_parser": null, "reasoning_parser": null}
+  },
   "quant_methods": {
     "fp8": "FP8 (E4M3). Hopper/Blackwell 텐서코어. ModelOpt 사전 양자화 또는 --kv_cache_dtype fp8.",
     "modelopt_fp4": "NVFP4 (TensorRT-Model-Optimizer). Blackwell FP4 텐서코어 필요.",

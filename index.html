@@ -3,14 +3,14 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>LLM 자체호스팅 계산기 · VRAM·비용·vLLM/SGLang/TensorRT-LLM 서빙 준비도 (docker-compose·K8s 매니페스트)</title>
+<title>LLM 자체 호스팅 계산기 · VRAM·비용·vLLM/SGLang/TensorRT-LLM 서빙 준비도 (docker-compose·K8s 매니페스트)</title>
 <meta name="description" content="이 LLM, 내 GPU/맥에서 돌아갈까? API보다 쌀까? vLLM·SGLang·TensorRT-LLM에서 네이티브로 서빙되나? VRAM 적합성·토큰속도·손익분기 계산 + 노드별 배치 + 세 엔진 서빙 지원 판정(모델·양자화·하드웨어별) + 바로 쓰는 docker-compose·Kubernetes 매니페스트 생성을 브라우저에서 즉시. 키 없음, 데이터 전송 없음.">
 <link rel="stylesheet" href="assets/style.css">
 </head>
 <body>
 <header>
   <div class="header-top">
-    <h1 data-i18n="h1">LLM 자체호스팅 계산기</h1>
+    <h1 data-i18n="h1">LLM 자체 호스팅 계산기</h1>
     <div class="controls">
       <div class="toggle-group" id="langToggle" role="group" aria-label="Language">
         <button type="button" data-lang="ko">한국어</button>
@@ -115,7 +115,7 @@
     </div>
 
     <div class="block">
-      <div class="block-title" data-i18n="calc.selfvsapi">자체호스팅 vs API</div>
+      <div class="block-title" data-i18n="calc.selfvsapi">자체 호스팅 vs API</div>
       <div id="costBox"></div>
     </div>
     </div><!-- /panelCalc -->
@@ -127,8 +127,16 @@
         <div id="vllmVerdictBox"></div>
       </div>
       <div class="block">
+        <div class="block-title" data-i18n="rd.versions">엔진 버전 · 최근 3개</div>
+        <div class="versions" id="vllmVersions"></div>
+      </div>
+      <div class="block">
         <div class="block-title" data-i18n="rd.servecmd">서빙 명령 (계산기 입력에서 도출)</div>
         <div id="vllmParams"></div>
+      </div>
+      <div class="block">
+        <div class="block-title" data-i18n="rd.toolcalling">툴 콜링 파라미터 (이 모델)</div>
+        <div id="vllmToolCalling"></div>
       </div>
       <div class="block">
         <div class="block-title" data-i18n="rd.manifest">배포 매니페스트</div>
@@ -153,8 +161,16 @@
         <div id="sglangVerdictBox"></div>
       </div>
       <div class="block">
+        <div class="block-title" data-i18n="rd.versions">엔진 버전 · 최근 3개</div>
+        <div class="versions" id="sglangVersions"></div>
+      </div>
+      <div class="block">
         <div class="block-title" data-i18n="rd.servecmd">서빙 명령 (계산기 입력에서 도출)</div>
         <div id="sglangParams"></div>
+      </div>
+      <div class="block">
+        <div class="block-title" data-i18n="rd.toolcalling">툴 콜링 파라미터 (이 모델)</div>
+        <div id="sglangToolCalling"></div>
       </div>
       <div class="block">
         <div class="block-title" data-i18n="rd.manifest">배포 매니페스트</div>
@@ -179,8 +195,16 @@
         <div id="trtVerdictBox"></div>
       </div>
       <div class="block">
+        <div class="block-title" data-i18n="rd.versions">엔진 버전 · 최근 3개</div>
+        <div class="versions" id="trtVersions"></div>
+      </div>
+      <div class="block">
         <div class="block-title" data-i18n="rd.servecmd">서빙 명령 (계산기 입력에서 도출)</div>
         <div id="trtParams"></div>
+      </div>
+      <div class="block">
+        <div class="block-title" data-i18n="rd.toolcalling">툴 콜링 파라미터 (이 모델)</div>
+        <div id="trtToolCalling"></div>
       </div>
       <div class="block">
         <div class="block-title" data-i18n="rd.manifest">배포 매니페스트</div>
@@ -273,14 +297,14 @@
 
 <section class="reference" id="reference">
   <h2 data-i18n-html="ref.h2">참고 · 이미지 생성 &amp; 음성(STT/TTS) 최신 모델·API 가격</h2>
-  <p class="ref-sub" data-i18n-html="ref.sub">아래는 <b>토큰 단위가 아니라서</b> 위 토큰 계산기와 1:1로 비교되지 않는 항목입니다 — 이미지 생성 API, 그리고 음성(STT/TTS) 자체호스팅 모델과 API 가격을 <b>최신 참고용</b>으로 정리했습니다. 모두 공개 정보 기반 근사입니다.</p>
+  <p class="ref-sub" data-i18n-html="ref.sub">아래는 <b>토큰 단위가 아니라서</b> 위 토큰 계산기와 1:1로 비교되지 않는 항목입니다 — 이미지 생성 API, 그리고 음성(STT/TTS) 자체 호스팅 모델과 API 가격을 <b>최신 참고용</b>으로 정리했습니다. 모두 공개 정보 기반 근사입니다.</p>
   <div class="ref-grid">
     <div class="ref-card">
       <h3 data-i18n="ref.image">이미지 생성 API</h3>
       <div class="ref-table" id="refImage"></div>
     </div>
     <div class="ref-card">
-      <h3 data-i18n="ref.speechself">음성 STT/TTS — 자체호스팅 모델</h3>
+      <h3 data-i18n="ref.speechself">음성 STT/TTS — 자체 호스팅 모델</h3>
       <div class="ref-table" id="refSpeechSelf"></div>
     </div>
     <div class="ref-card">
@@ -297,7 +321,7 @@
       <li data-i18n-html="how.calc.li1"><b>VRAM</b> = 가중치(<code>total_params × bytes/param</code>) + KV캐시(<code>2 × layers × kv_dim × 2B × 컨텍스트</code>, GQA 반영) + 오버헤드(<code>1.2GB + 5%</code>).</li>
       <li data-i18n-html="how.calc.li2"><b>추론 속도</b>(단일 스트림)는 디코딩이 메모리 대역폭에 묶인다는 근사: <code>MBU(0.5) × 대역폭 ÷ (활성 파라미터 × bytes)</code>. MoE는 활성 파라미터만 세므로 빠릅니다.</li>
       <li data-i18n-html="how.calc.li3"><b>서빙 처리량</b> = 단일속도 × 유효배치 × 0.7. 유효배치는 남은 VRAM으로 감당 가능한 동시 시퀀스 수로 상한.</li>
-      <li data-i18n-html="how.calc.li4"><b>손익분기 (임대)</b>: 자체호스팅 $/1M = <code>(렌트/시간 ÷ 3600) ÷ 처리량 × 1e6</code>. 이 값이 API 단가보다 낮으면(=GPU를 충분히 채우면) 자체호스팅이 쌉니다.</li>
+      <li data-i18n-html="how.calc.li4"><b>손익분기 (임대)</b>: 자체 호스팅 $/1M = <code>(렌트/시간 ÷ 3600) ÷ 처리량 × 1e6</code>. 이 값이 API 단가보다 낮으면(=GPU를 충분히 채우면) 자체 호스팅이 쌉니다.</li>
       <li data-i18n-html="how.calc.li5"><b>회수 개월 (구매/온프렘)</b>: 장비를 <b>사는</b> 경우 — <code>capex = 구매가 × 필요 GPU수</code>, 월 전기료 = <code>전력(kW) × 월 토큰 생성에 쓴 GPU-시간 × $/kWh</code>, <code>회수개월 = capex ÷ (월 API비용 − 월 전기료)</code>. 전기료는 <b>토큰 생성에 실제 쓴 시간</b>만 계산하며 <b>idle 전력은 제외</b>합니다(실제 24/7 전용 박스는 더 듭니다). 월 순절감이 0 이하면 이 토큰량에선 회수되지 않습니다.</li>
     </ul>
     <p class="dim" data-i18n-html="how.calc.note">모두 <b>근사 추정</b>입니다. 실제 수치는 커널·프레임워크·페이징·양자화 방식에 따라 달라집니다. 의사결정 전 실측 벤치를 권장합니다.</p>
@@ -311,7 +335,7 @@
       <li data-i18n-html="how.quant.li3"><b>MXFP4</b> (OCP Microscaling): FP4 + <b>32개마다 E8M0 블록 스케일</b> → 유효 4.25bit. OpenAI <code>gpt-oss</code>의 기본 포맷. Blackwell/일부 최신 하드웨어에서 가속.</li>
       <li data-i18n-html="how.quant.li4"><b>FP8</b> (E4M3/E5M2): 8-bit 부동소수. Hopper(H100/H200)·Blackwell 네이티브. 거의 무손실에 가까워 서빙 기본값으로 인기(가중치+KV+활성값 모두 FP8 가능).</li>
       <li data-i18n-html="how.quant.li5"><b>INT4 계열 PTQ</b>: <b>GPTQ</b>(2차 헤시안 기반 반올림), <b>AWQ</b>(활성값-인지 채널 스케일), <b>AutoRound</b>, <b>HQQ</b>(캘리브레이션 없이 빠름), <b>bitsandbytes NF4</b>(QLoRA 학습용). <b>SmoothQuant</b>는 활성 이상치를 가중치로 이전해 INT8을 매끄럽게. <b>QuaRot·SpinQuant</b>는 회전으로 이상치를 눌러 4-bit 정확도를 끌어올림.</li>
-      <li data-i18n-html="how.quant.li6"><b>GGUF k-quants</b> (llama.cpp): <code>Q4_K_M</code>·<code>Q5_K_M</code>·<code>Q6_K</code> 등 블록·혼합정밀. Apple·CPU·소비자 GPU 자체호스팅의 사실상 표준. <code>Q4_K_M</code> ≈ 4.5bit로 NVFP4와 비슷한 크기.</li>
+      <li data-i18n-html="how.quant.li6"><b>GGUF k-quants</b> (llama.cpp): <code>Q4_K_M</code>·<code>Q5_K_M</code>·<code>Q6_K</code> 등 블록·혼합정밀. Apple·CPU·소비자 GPU 자체 호스팅의 사실상 표준. <code>Q4_K_M</code> ≈ 4.5bit로 NVFP4와 비슷한 크기.</li>
       <li data-i18n-html="how.quant.li7"><b>더 낮은 비트</b>: INT2·<b>1.58-bit(BitNet)</b>·2-bit AQLM/QuIP# 도 있으나 정확도 손실이 커 대개 특수용도. 계산기는 다루지 않습니다.</li>
       <li data-i18n-html="how.quant.li8"><b>주의</b>: 위 tok/s 이득은 <b>메모리 절감</b> 기준입니다. NVFP4/MXFP4는 <b>FP4 텐서코어가 있어야</b> 연산까지 가속되고(없으면 메모리 이득만), INT4는 Marlin 등 최적화 커널이 필요합니다. KV 캐시는 계산기가 FP16으로 잡지만 실제로는 FP8/INT8로도 줄일 수 있습니다.</li>
     </ul>
