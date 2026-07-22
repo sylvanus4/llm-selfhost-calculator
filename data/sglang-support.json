@@ -51,6 +51,72 @@
     "Olmo2ForCausalLM": {"tier": "native"},
     "StableLmForCausalLM": {"tier": "native"}
   },
+  "versions": [
+    {
+      "version": "0.6",
+      "latest_patch": "0.6.2",
+      "released": "2026-07",
+      "docs": "https://docs.sglang.ai/references/supported_models.html",
+      "highlights": [
+        {"ko": "DeepSeek V4 압축 KV/희소 인덱서 경로 · GLM MoE DSA 어텐션 · 하이브리드 Mamba-2(NemotronH/Granite) partial 지원", "en": "DeepSeek V4 compressed-KV / sparse-indexer path · GLM MoE DSA attention · partial hybrid Mamba-2 (NemotronH/Granite)"},
+        {"ko": "툴 콜링 파서 deepseekv3·glm45·qwen3_coder·kimi_k2 · reasoning 파서(qwen3·glm45·gpt-oss)", "en": "Tool-call parsers deepseekv3, glm45, qwen3_coder, kimi_k2 · reasoning parsers (qwen3, glm45, gpt-oss)"},
+        {"ko": "DP-attention(MLA) 처리량 개선 · MXFP4 gpt-oss 자동 감지", "en": "DP-attention (MLA) throughput improvements · MXFP4 gpt-oss auto-detect"}
+      ],
+      "notable_flags": ["--tool-call-parser", "--reasoning-parser", "--enable-dp-attention", "--quantization mxfp4"]
+    },
+    {
+      "version": "0.5",
+      "latest_patch": "0.5.3",
+      "released": "2026-04",
+      "docs": "https://docs.sglang.ai/references/supported_models.html",
+      "highlights": [
+        {"ko": "Llama 4·Qwen3 VL 멀티모달 경로 · RadixAttention 캐시 재사용 개선", "en": "Llama 4 / Qwen3-VL multimodal paths · improved RadixAttention cache reuse"},
+        {"ko": "FP8/W8A8 INT8 서빙 안정화 · 연속 배칭 스케줄러 개선", "en": "FP8 / W8A8-INT8 serving stabilized · continuous-batching scheduler improvements"},
+        {"ko": "툴 콜링 파서 qwen25·llama3·mistral·deepseekv3", "en": "Tool-call parsers qwen25, llama3, mistral, deepseekv3"}
+      ],
+      "notable_flags": ["--tool-call-parser qwen25", "--reasoning-parser deepseek-r1", "--quantization fp8"]
+    },
+    {
+      "version": "0.4",
+      "latest_patch": "0.4.9",
+      "released": "2026-01",
+      "docs": "https://docs.sglang.ai/references/supported_models.html",
+      "highlights": [
+        {"ko": "DeepSeek V3 MLA + DP-attention 대표 경로 확립 · Qwen2.5/Qwen3 등록", "en": "Established DeepSeek V3 MLA + DP-attention flagship path · Qwen2.5/Qwen3 registered"},
+        {"ko": "초기 함수호출 파서(qwen25·llama3) · 구조화 출력(xgrammar)", "en": "Initial function-call parsers (qwen25, llama3) · structured outputs (xgrammar)"},
+        {"ko": "AWQ/GPTQ Marlin · 스펙 디코딩(EAGLE) 지원", "en": "AWQ/GPTQ Marlin · speculative decoding (EAGLE)"}
+      ],
+      "notable_flags": ["--tool-call-parser qwen25", "--grammar-backend xgrammar", "--speculative-algorithm EAGLE"]
+    }
+  ],
+  "tool_calling": {
+    "_note": "SGLang 툴 콜링은 --tool-call-parser <parser>, thinking 모델은 --reasoning-parser <parser>를 함께 줍니다. parser 이름은 vLLM과 다릅니다(SGLang은 qwen25·deepseekv3·gpt-oss 식 표기). 릴리스마다 추가 — 최신 문서 확인.",
+    "_default": {"tool_parser": null, "reasoning_parser": null, "note": {"ko": "이 아키텍처의 SGLang 네이티브 툴 파서는 미확인 — chat_template와 SGLang 문서에서 --tool-call-parser 값을 확인하세요.", "en": "No confirmed SGLang native tool parser for this architecture — check the chat_template and SGLang docs for --tool-call-parser."}},
+    "LlamaForCausalLM": {"tool_parser": "llama3", "reasoning_parser": null},
+    "Llama4ForConditionalGeneration": {"tool_parser": "llama3", "reasoning_parser": null},
+    "MistralForCausalLM": {"tool_parser": "mistral", "reasoning_parser": null},
+    "MixtralForCausalLM": {"tool_parser": "mistral", "reasoning_parser": null},
+    "Qwen2ForCausalLM": {"tool_parser": "qwen25", "reasoning_parser": null},
+    "Qwen2MoeForCausalLM": {"tool_parser": "qwen25", "reasoning_parser": null},
+    "Qwen3ForCausalLM": {"tool_parser": "qwen25", "reasoning_parser": "qwen3", "note": {"ko": "Qwen3 — 툴 qwen25 파서 재사용 · thinking은 --reasoning-parser qwen3.", "en": "Qwen3 — reuses the qwen25 tool parser · thinking uses --reasoning-parser qwen3."}},
+    "Qwen3MoeForCausalLM": {"tool_parser": "qwen25", "reasoning_parser": "qwen3", "note": {"ko": "코더 변형은 --tool-call-parser qwen3_coder.", "en": "Coder variants use --tool-call-parser qwen3_coder."}},
+    "Qwen2VLForConditionalGeneration": {"tool_parser": "qwen25", "reasoning_parser": null},
+    "Qwen3VLForConditionalGeneration": {"tool_parser": "qwen25", "reasoning_parser": "qwen3"},
+    "DeepseekV2ForCausalLM": {"tool_parser": "deepseekv3", "reasoning_parser": "deepseek-r1"},
+    "DeepseekV3ForCausalLM": {"tool_parser": "deepseekv3", "reasoning_parser": "deepseek-r1", "note": {"ko": "DeepSeek — 툴 deepseekv3 · reasoning deepseek-r1(SGLang 표기, 하이픈).", "en": "DeepSeek — tool deepseekv3 · reasoning deepseek-r1 (SGLang spelling, hyphen)."}},
+    "DeepseekV4ForCausalLM": {"tool_parser": "deepseekv3", "reasoning_parser": "deepseek-r1"},
+    "Glm4MoeForCausalLM": {"tool_parser": "glm45", "reasoning_parser": "glm45", "note": {"ko": "GLM MoE — --tool-call-parser glm45 · --reasoning-parser glm45.", "en": "GLM MoE — --tool-call-parser glm45 · --reasoning-parser glm45."}},
+    "GlmForCausalLM": {"tool_parser": "glm45", "reasoning_parser": "glm45"},
+    "Glm4ForCausalLM": {"tool_parser": "glm45", "reasoning_parser": "glm45"},
+    "GptOssForCausalLM": {"tool_parser": "gpt-oss", "reasoning_parser": "gpt-oss", "note": {"ko": "gpt-oss(Harmony) — --tool-call-parser gpt-oss · --reasoning-parser gpt-oss.", "en": "gpt-oss (Harmony) — --tool-call-parser gpt-oss · --reasoning-parser gpt-oss."}},
+    "MiniMaxText01ForCausalLM": {"tool_parser": "pythonic", "reasoning_parser": null, "note": {"ko": "MiniMax는 SGLang 전용 파서 미확인 — pythonic/커스텀 템플릿, 실측 권장.", "en": "MiniMax has no confirmed SGLang parser — pythonic / custom template, testing recommended."}},
+    "MiniMaxM2ForCausalLM": {"tool_parser": "pythonic", "reasoning_parser": null, "note": {"ko": "MiniMax M2 — SGLang 파서 미확인, 실측 권장.", "en": "MiniMax M2 — no confirmed SGLang parser, testing recommended."}},
+    "NemotronHForCausalLM": {"tool_parser": "llama3", "reasoning_parser": null, "note": {"ko": "Nemotron H — llama3 템플릿 시도, 실측 권장.", "en": "Nemotron H — try the llama3 template, testing recommended."}},
+    "GraniteMoeHybridForCausalLM": {"tool_parser": "pythonic", "reasoning_parser": null, "note": {"ko": "Granite 하이브리드 — SGLang 전용 파서 미확인, pythonic/커스텀.", "en": "Granite hybrid — no confirmed SGLang parser, pythonic / custom."}},
+    "Gemma3ForCausalLM": {"tool_parser": "pythonic", "reasoning_parser": null, "note": {"ko": "Gemma는 네이티브 파서 없음 — pythonic/커스텀 chat_template.", "en": "Gemma has no native parser — pythonic / custom chat_template."}},
+    "Gemma4ForCausalLM": {"tool_parser": "pythonic", "reasoning_parser": null},
+    "Gemma4ForConditionalGeneration": {"tool_parser": "pythonic", "reasoning_parser": null}
+  },
   "quant_methods": {
     "fp8": "FP8 W8A8. Hopper/Blackwell 네이티브. --quantization fp8.",
     "blockwise_int8": "블록와이즈 INT8. --quantization blockwise_int8.",

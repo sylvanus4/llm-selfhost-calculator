@@ -169,6 +169,7 @@ function render() {
   renderSglang(r);
   renderTrt(r);
   renderSpark(model, gpu, context);
+  renderReference();   // re-render on every pass so language toggle re-translates the speech/image tables (fixes EN-mode Korean leak)
 }
 
 // ---- vLLM serving-readiness tab -------------------------------------------
@@ -232,12 +233,61 @@ function renderVllm(r) {
     : "";
   el("vllmParams").innerHTML = `<pre class="code small"><code>${esc(cli)}</code></pre>${quantWhatIf}`;
 
+  renderVersions("vllmVersions", support, support.vllm_version);
+  const curatedModel = vllmState.fetched ? null : state.models.find(m => m.id === el("model").value);
+  renderToolCalling("vllmToolCalling", "vllm", verdict.arch, curatedModel, support, verdict, "vLLM");
+
   renderManifest();
 }
 
 function renderManifest() {
   if (!vllmState.manifests) return;
   el("manifestCode").textContent = vllmState.manifests[vllmState.active] || "";
+}
+
+// ---- Shared: engine version history + per-model tool-calling ---------------
+// pickLang: render a {ko,en} object OR a ko-source string (via DATA map) in the current language.
+function pickLang(v) {
+  if (v == null) return "";
+  if (typeof v === "string") return I18N.td(v);
+  const l = I18N.lang;
+  return v[l] != null ? v[l] : (v.ko != null ? v.ko : (v.en != null ? v.en : ""));
+}
+function versionIsCurrent(v, currentVer) {
+  return String(currentVer || "").indexOf(String(v.version)) === 0;
+}
+function renderVersions(containerId, support, currentVer) {
+  const box = el(containerId); if (!box) return;
+  const vers = LLMCalc.engineVersionHistory(support);
+  box.innerHTML = vers.map(v => {
+    const cur = versionIsCurrent(v, currentVer);
+    const curBadge = cur ? ` <span class="badge ok">${tr("dyn.rd.ver.current")}</span>` : "";
+    const patch = v.latest_patch && v.latest_patch !== v.version ? ` <span class="dim">(${esc(v.latest_patch)})</span>` : "";
+    const rel = v.released ? ` <span class="dim">· ${tr("dyn.rd.ver.released", { d: esc(v.released) })}</span>` : "";
+    const docs = v.docs ? ` · <a href="${esc(v.docs)}" target="_blank" rel="noopener">${tr("dyn.rd.ver.docs")}</a>` : "";
+    const hi = (v.highlights || []).map(h => `<li>${pickLang(h)}</li>`).join("");
+    const flags = (v.notable_flags || []).length
+      ? `<div class="dim ver-flags"><b>${tr("dyn.rd.ver.flags")}:</b> ${v.notable_flags.map(f => `<code>${esc(f)}</code>`).join(" ")}</div>` : "";
+    return `<div class="ver-card${cur ? " cur" : ""}"><div class="ver-head"><b>v${esc(v.version)}</b>${patch}${curBadge}${rel}${docs}</div>${hi ? `<ul class="ver-hi">${hi}</ul>` : ""}${flags}</div>`;
+  }).join("");
+}
+function renderToolCalling(containerId, engine, arch, model, support, verdict, engineLabel) {
+  const box = el(containerId); if (!box) return;
+  if (verdict && verdict.tier === "incompatible") {
+    box.innerHTML = `<div class="dim warn">${tr("dyn.rd.tool.na", { engine: esc(engineLabel) })}</div>`;
+    return;
+  }
+  const tcfg = LLMCalc.toolCallingConfig(arch, model, support, engine);
+  const srcKey = tcfg.source === "model" ? "dyn.rd.tool.src.model"
+    : tcfg.source === "arch" ? "dyn.rd.tool.src.arch" : "dyn.rd.tool.src.default";
+  const src = `<div class="dim" style="margin-top:6px">${tr(srcKey, { arch: esc(arch || "—") })}</div>`;
+  const note = tcfg.note ? `<div class="dim" style="margin-top:4px">${pickLang(tcfg.note)}</div>` : "";
+  if (!tcfg.tool_parser) { box.innerHTML = `<div>${tr("dyn.rd.tool.none")}</div>${note}${src}`; return; }
+  const rows = `<div><b>${tr("dyn.rd.tool.parser")}:</b> <code>${esc(tcfg.tool_parser)}</code></div>` +
+    (tcfg.reasoning_parser ? `<div><b>${tr("dyn.rd.tool.reasoning")}:</b> <code>${esc(tcfg.reasoning_parser)}</code></div>` : "");
+  const flags = `<div class="dim" style="margin-top:6px">${tr("dyn.rd.tool.add")}</div>` +
+    `<pre class="code small"><code>${esc(tcfg.flags.join(" \\\n  "))}</code></pre>`;
+  box.innerHTML = rows + note + flags + src;
 }
 
 // ---- SGLang / TensorRT-LLM serving-readiness tabs -------------------------
@@ -311,20 +361,26 @@ function renderEngineTab(o) {
     el(o.ids.params).innerHTML = `<pre class="code small"><code>${esc(cli)}</code></pre>${quantWhatIf}`;
   }
   el(o.ids.manifestCode).textContent = o.state.manifests[o.state.active] || "";
+
+  renderVersions(o.ids.versions, support, support.version);
+  const engineModel = ctx.verdictInput.curated || null;
+  renderToolCalling(o.ids.toolCalling, o.engine, verdict.arch, engineModel, support, verdict, o.engineLabel);
 }
 
 function renderSglang(r) {
   renderEngineTab({
-    engineLabel: "SGLang", support: state.sglang, ctx: engineModelContext(r),
+    engine: "sglang", engineLabel: "SGLang", support: state.sglang, ctx: engineModelContext(r),
     verdictFn: LLMCalc.sglangVerdict, specFn: LLMCalc.buildSglangSpec, state: sglangState,
-    ids: { badge: "sglangBadge", verdict: "sglangVerdictBox", params: "sglangParams", manifestCode: "sglangManifestCode" },
+    ids: { badge: "sglangBadge", verdict: "sglangVerdictBox", params: "sglangParams", manifestCode: "sglangManifestCode",
+      versions: "sglangVersions", toolCalling: "sglangToolCalling" },
   });
 }
 function renderTrt(r) {
   renderEngineTab({
-    engineLabel: "TensorRT-LLM", support: state.trtllm, ctx: engineModelContext(r),
+    engine: "trtllm", engineLabel: "TensorRT-LLM", support: state.trtllm, ctx: engineModelContext(r),
     verdictFn: LLMCalc.trtllmVerdict, specFn: LLMCalc.buildTrtllmSpec, state: trtState,
-    ids: { badge: "trtBadge", verdict: "trtVerdictBox", params: "trtParams", manifestCode: "trtManifestCode" },
+    ids: { badge: "trtBadge", verdict: "trtVerdictBox", params: "trtParams", manifestCode: "trtManifestCode",
+      versions: "trtVersions", toolCalling: "trtToolCalling" },
   });
 }
 

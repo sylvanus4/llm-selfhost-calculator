@@ -512,7 +512,44 @@
     });
   }
 
+  // ---- Version history + per-model tool-calling parameters -----------------
+  // engineVersionHistory: recent-first version cards for the readiness "버전" block.
+  // Falls back to a single synthesized entry if a support file predates the schema.
+  function engineVersionHistory(support) {
+    if (support && Array.isArray(support.versions) && support.versions.length) return support.versions;
+    const v = (support && (support.vllm_version || support.version)) || "latest";
+    return [{ version: v, latest_patch: v, released: null, docs: (support && support.docs) || null, highlights: [], notable_flags: [] }];
+  }
+
+  // Engine-specific tool-calling flag list for a resolved parser pair.
+  function toolFlagsFor(engine, tp, rp) {
+    const f = [];
+    if (!tp) return f;
+    if (engine === "sglang") { f.push("--tool-call-parser " + tp); if (rp) f.push("--reasoning-parser " + rp); }
+    else if (engine === "trtllm") { f.push("--tool_call_parser " + tp); if (rp) f.push("--reasoning_parser " + rp); }
+    else { f.push("--enable-auto-tool-choice", "--tool-call-parser " + tp); if (rp) f.push("--reasoning-parser " + rp); }
+    return f;
+  }
+
+  // Resolve tool-calling config for an architecture on an engine.
+  // Precedence: model[engine].tool_parser override -> support.tool_calling[arch] -> _default.
+  // Returns { tool_parser, reasoning_parser, flags[], note{ko,en}|null, source, arch }.
+  function toolCallingConfig(arch, model, support, engine) {
+    const tc = (support && support.tool_calling) || {};
+    const mv = model && model[engine];
+    let entry, source;
+    if (mv && Object.prototype.hasOwnProperty.call(mv, "tool_parser")) {
+      entry = { tool_parser: mv.tool_parser, reasoning_parser: mv.reasoning_parser || null, note: mv.tool_note || null };
+      source = "model";
+    } else if (arch && tc[arch]) { entry = tc[arch]; source = "arch"; }
+    else { entry = tc._default || { tool_parser: null, reasoning_parser: null }; source = "default"; }
+    const tp = entry.tool_parser || null, rp = entry.reasoning_parser || null;
+    return { tool_parser: tp, reasoning_parser: rp, flags: toolFlagsFor(engine, tp, rp),
+      note: entry.note || null, source, arch: arch || null };
+  }
+
   const api = { compute, BYTES_PER_PARAM, KV_BYTES, MBU, BATCH_EFF,
+    engineVersionHistory, toolCallingConfig, toolFlagsFor,
     normalizeHfRef, vllmVerdict, buildServingSpec, servedName, vllmQuantFlag, detectQuantMethod,
     sglangVerdict, trtllmVerdict, buildSglangSpec, buildTrtllmSpec,
     sglangQuantFlag, trtllmQuantFlag, engineVerdict, engineHardwareGate,
