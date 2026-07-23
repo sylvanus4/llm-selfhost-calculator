@@ -11,6 +11,7 @@
     "note": "SGLang은 NVIDIA(CUDA)·AMD(ROCm) 가속기에서 동작합니다. Apple Silicon·NPU(Furiosa/Rebellions/Gaudi/Trainium)는 미지원 — 이 경우 vLLM(Apple: llama.cpp/MLX, NPU: 벤더 런타임)을 사용하세요."
   },
   "arch_support": {
+    "InklingForConditionalGeneration": {"tier": "native", "caveats": ["Day-0 지원 · NVIDIA는 BF16+NVFP4 체크포인트, AMD는 BF16만 — MI35X는 --attention-backend triton --moe-runner-backend aiter 필요"]},
     "LlamaForCausalLM": {"tier": "native"},
     "Llama4ForConditionalGeneration": {"tier": "native", "caveats": ["멀티모달 Llama 4 — 비전 경로 포함"]},
     "MistralForCausalLM": {"tier": "native"},
