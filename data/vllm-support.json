@@ -48,7 +48,8 @@
     "OlmoForCausalLM",
     "Olmo2ForCausalLM",
     "ExaoneForCausalLM",
-    "Exaone4ForCausalLM"
+    "Exaone4ForCausalLM",
+    "InklingForConditionalGeneration"
   ],
   "versions": [
     {
@@ -91,6 +92,7 @@
   "tool_calling": {
     "_note": "vLLM 툴 콜링은 --enable-auto-tool-choice + --tool-call-parser <parser>가 필요하고, thinking/reasoning 모델은 --reasoning-parser <parser>를 함께 줍니다. 일부 모델은 tool용 chat_template를 별도로 지정해야 합니다. parser 이름은 vLLM 릴리스마다 추가/변경됩니다 — 최신 문서 확인.",
     "_default": {"tool_parser": null, "reasoning_parser": null, "note": {"ko": "이 아키텍처의 네이티브 툴 파서는 미확인입니다 — 모델 카드의 chat_template와 vLLM 문서에서 --tool-call-parser 값을 확인하세요(대개 hermes 또는 pythonic).", "en": "No confirmed native tool parser for this architecture — check the model card's chat_template and the vLLM docs for the --tool-call-parser value (often hermes or pythonic)."}},
+    "InklingForConditionalGeneration": {"tool_parser": "inkling", "reasoning_parser": "inkling", "note": {"ko": "가변 reasoning-effort(thinking) 모델 — --tool-call-parser inkling --reasoning-parser inkling. Day-0 vLLM 공식 지원(BF16·NVFP4 체크포인트 둘 다).", "en": "Variable reasoning-effort (thinking) model — --tool-call-parser inkling --reasoning-parser inkling. Official vLLM Day-0 support (both BF16 and NVFP4 checkpoints)."}},
     "LlamaForCausalLM": {"tool_parser": "llama3_json", "reasoning_parser": null},
     "Llama4ForConditionalGeneration": {"tool_parser": "llama4_pythonic", "reasoning_parser": null},
     "MistralForCausalLM": {"tool_parser": "mistral", "reasoning_parser": null, "note": {"ko": "Mistral 툴 템플릿 권장 — --tool-call-parser mistral (mistral_common 토크나이저 사용 시 정확도↑).", "en": "Prefer the Mistral tool template — --tool-call-parser mistral (more accurate with the mistral_common tokenizer)."}},
