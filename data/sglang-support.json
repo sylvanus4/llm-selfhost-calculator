@@ -1,9 +1,9 @@
 {
   "_note": "SGLang 서빙 준비도 판정 근거. arch_support = 모델의 HF config.json architectures[] 대표 문자열 → SGLang 지원 등급 매핑(전수 아님 — 매칭되면 高신뢰, 미매칭이라고 완전 미지원은 아님). SGLang은 vLLM과 달리 python 모델 파일 레지스트리(sglang/srt/models) 기반이라, 레지스트리에 있으면 native. DeepSeek/MLA + DP-attention은 SGLang의 대표 강점 경로. 하이브리드 Mamba-2(NemotronH/GraniteMoeHybrid)와 신규 MoE는 vLLM보다 뒤늦게 들어와 partial로 본다. hardware = SGLang은 NVIDIA(CUDA)·AMD(ROCm)에서 돌고 Apple/NPU는 미지원. quant_methods = --quantization 플래그로 받는 체크포인트 양자화 포맷. 이 파일은 SGLang 릴리스마다 갱신한다(version 핀). 출처: SGLang supported_models 문서 + 릴리스 노트(2026-07). 모든 등급은 계획용 근사 — 실측 벤치 권장.",
-  "_updated": "2026-07-24",
-  "version": "0.5.15.post1",
+  "_updated": "2026-07-25",
+  "version": "0.5.16",
   "docs": "https://docs.sglang.ai/supported_models.html",
-  "image": "lmsysorg/sglang:v0.5.15.post1",
+  "image": "lmsysorg/sglang:v0.5.16",
   "default_port": 30000,
   "hardware": {
     "supported_kinds": ["gpu", "amd"],
@@ -55,13 +55,13 @@
   "versions": [
     {
       "version": "0.5",
-      "latest_patch": "0.5.15.post1",
+      "latest_patch": "0.5.16",
       "released": "2026-07",
       "docs": "https://docs.sglang.ai/supported_models.html",
       "highlights": [
+        {"ko": "DSpark 신뢰도기반 스펙 디코딩(고정 draft 길이 대신 draft confidence로 verify window 크기 결정, DeepSeek-V4-Pro TP8 B300서 383.7 tok/s @accept~5) v0.5.16 · Inkling(975B 멀티모달 MoE, sliding-window+full+Mamba2 혼합 attention) Day-0 지원 v0.5.16", "en": "DSpark confidence-driven speculative decoding (verify window sized from draft confidence instead of fixed length; 383.7 tok/s @accept~5 on DeepSeek-V4-Pro TP8 B300) in v0.5.16 · Inkling (975B multimodal MoE mixing sliding-window/full/Mamba2 attention) Day-0 support in v0.5.16"},
         {"ko": "DeepSeek V4 풀 인퍼런스 스택(텐서/전문가/컨텍스트 병렬 + 분리서빙, DeepGemm·FlashMLA 커널) v0.5.12 · GLM-5.2 NVFP4 Blackwell 튜닝(B300/GB300) v0.5.15", "en": "DeepSeek V4 full inference stack (tensor/expert/context parallel + disaggregation, DeepGemm/FlashMLA kernels) in v0.5.12 · GLM-5.2 NVFP4 tuned for Blackwell (B300/GB300) in v0.5.15"},
-        {"ko": "Speculative Decoding V2가 기본값(오버랩 스케줄링으로 CPU 오버헤드 감소, EAGLE/MTP/DFLASH) v0.5.11 · IndexShare MTP로 draft 비용 1.9배 절감", "en": "Speculative Decoding V2 (overlap scheduling, EAGLE/MTP/DFLASH) is now default in v0.5.11 · IndexShare MTP cuts draft cost 1.9x"},
-        {"ko": "Gemma 4·GLM-5.1/5.2·Qwen3.6·DeepSeek V4 신규 모델 지원 · HiCache/HiSparse 메모리 최적화 + decode radix cache로 장문맥 효율 개선", "en": "New model support (Gemma 4, GLM-5.1/5.2, Qwen3.6, DeepSeek V4) · HiCache/HiSparse memory optimization + decode radix cache improving long-context efficiency"}
+        {"ko": "UnifiedRadixTree가 SWA/Mamba/DSA 모델 기본 캐시로 전환 + GLM-5.2 prefill CP에서 KV/indexer 캐시 레이어 분할로 랭크당 메모리 ~74%↓ v0.5.16", "en": "UnifiedRadixTree becomes the default cache for SWA/Mamba/DSA models + GLM-5.2 prefill-CP KV/indexer cache layer split cuts per-rank memory ~74% v0.5.16"}
       ],
       "notable_flags": ["--tool-call-parser", "--reasoning-parser", "--enable-dp-attention", "--quantization mxfp4"]
     },
