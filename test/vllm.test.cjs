@@ -38,11 +38,15 @@ ok("curated vllm_version pinned", vq.vllm_version === support.vllm_version);
 ok("all curated models have vllm.tier", models.every(m => m.vllm && typeof m.vllm.tier === "string"));
 // Curated models resolve to a valid tier. Most are native/transformers (ok=true), but a
 // curated model MAY legitimately be pre-release / novel-arch (tier custom/unknown, ok=false)
-// — e.g. Kimi K3 (weights 2026-07-27, KDA/LatentMoE not yet in vLLM). Assert valid tier, not ok.
+// — e.g. Laguna S 2.1 (only the smaller sibling has an SGLang/TRT-LLM PR), Kimi K3 (weights
+// 2026-07-27, KDA/LatentMoE not yet in vLLM), openPangu 2.0 Pro (MLA+DSA+MHC custom modeling
+// code, Huawei points at its own omni-infer/Ascend stack, no vLLM support stated). Budget grows
+// as legitimately novel architectures are added — bump it (and name the model here) rather than
+// mis-tier a model as native/transformers just to stay under the old count.
 const VALID_TIERS = new Set(["native", "transformers", "custom", "unknown", "unsupported"]);
 ok("all curated resolve to a valid tier", models.every(m => VALID_TIERS.has(vllmVerdict({ curated: m }, support).tier)));
 ok("most curated resolve ok (native/transformers)",
-  models.filter(m => vllmVerdict({ curated: m }, support).ok).length >= models.length - 2);
+  models.filter(m => vllmVerdict({ curated: m }, support).ok).length >= models.length - 3);
 
 // 3. vllmVerdict — fetched config, 3-tier
 const nativeArch = vllmVerdict({ config: { architectures: ["LlamaForCausalLM"] }, id: "x/y" }, support);

@@ -485,6 +485,9 @@
     "텍스트 입력 / 오디오 출력": "text in / audio out",
     "STT $0.10/시간 · S2S $0.05/분": "STT $0.10/hr · S2S $0.05/min",
     "크레딧 기반 환산 [추정]": "credit-based conversion [est.]",
+    "MoE(384 routed top-8 + 공유 1, 505B 중 18B active — 모델 카드 공식 수치) · config.json 원시 레이어 합산 시 MTP 예측 레이어(num_nextn_predict_layers=3) 포함으로 약 542B까지 더 크게 계산됨(표준 서빙엔 MTP 레이어 미탑재) · MLA 압축 KV(kv_lora 512+rope 64=576, 표시 KV는 보수적 상한) · DSA 희소 인덱서(index_topk=2048)+슬라이딩 윈도우 혼합 어텐션 · 524,288(512K) 컨텍스트 · 화웨이 어센드 NPU로 사전학습(엔비디아 GPU 미사용) · openPangu Model License v2.0(상업적 이용 조건 확인 필요)": "MoE (384 routed top-8 + 1 shared, 18B active of 505B — per the official model card) · summing raw layers from config.json yields a larger ~542B once the MTP prediction layers (num_nextn_predict_layers=3) are included (not loaded for standard serving) · MLA compressed KV (kv_lora 512 + rope 64 = 576, shown KV is a conservative upper bound) · DSA sparse indexer (index_topk=2048) + sliding-window mixed attention · 524,288 (512K) context · pretrained on Huawei Ascend NPUs (no Nvidia GPUs used) · openPangu Model License v2.0 (check commercial-use terms)",
+    "OpenPanguV2ForCausalLM — 커스텀 모델링 코드(auto_map/trust_remote_code), 화웨이는 자체 omni-infer(Ascend NPU) 프레임워크를 권장하며 모델 카드에 vLLM 지원 언급 없음 — NVIDIA GPU 서빙은 실측 필요": "OpenPanguV2ForCausalLM — custom modeling code (auto_map/trust_remote_code); Huawei recommends its own omni-infer framework (Ascend NPU) and the model card does not mention vLLM support — NVIDIA GPU serving needs testing",
+    "OpenPanguV2ForCausalLM — 엔진 레지스트리 미등록, 지원 확인/실측 필요": "OpenPanguV2ForCausalLM — not registered in the engine registry, support unconfirmed / testing recommended",
     // speech.json units
     "/이미지": "/image",
     "/1M 오디오 tok": "/1M audio tok",
