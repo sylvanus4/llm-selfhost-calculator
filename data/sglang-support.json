@@ -1,9 +1,9 @@
 {
   "_note": "SGLang 서빙 준비도 판정 근거. arch_support = 모델의 HF config.json architectures[] 대표 문자열 → SGLang 지원 등급 매핑(전수 아님 — 매칭되면 高신뢰, 미매칭이라고 완전 미지원은 아님). SGLang은 vLLM과 달리 python 모델 파일 레지스트리(sglang/srt/models) 기반이라, 레지스트리에 있으면 native. DeepSeek/MLA + DP-attention은 SGLang의 대표 강점 경로. 하이브리드 Mamba-2(NemotronH/GraniteMoeHybrid)와 신규 MoE는 vLLM보다 뒤늦게 들어와 partial로 본다. hardware = SGLang은 NVIDIA(CUDA)·AMD(ROCm)에서 돌고 Apple/NPU는 미지원. quant_methods = --quantization 플래그로 받는 체크포인트 양자화 포맷. 이 파일은 SGLang 릴리스마다 갱신한다(version 핀). 출처: SGLang supported_models 문서 + 릴리스 노트(2026-07). 모든 등급은 계획용 근사 — 실측 벤치 권장.",
-  "_updated": "2026-07-25",
-  "version": "0.5.16",
+  "_updated": "2026-08-08",
+  "version": "0.5.17",
   "docs": "https://docs.sglang.ai/supported_models.html",
-  "image": "lmsysorg/sglang:v0.5.16",
+  "image": "lmsysorg/sglang:v0.5.17",
   "default_port": 30000,
   "hardware": {
     "supported_kinds": ["gpu", "amd"],
@@ -12,6 +12,7 @@
   },
   "arch_support": {
     "InklingForConditionalGeneration": {"tier": "native", "caveats": ["Day-0 지원 · NVIDIA는 BF16+NVFP4 체크포인트, AMD는 BF16만 — MI35X는 --attention-backend triton --moe-runner-backend aiter 필요"]},
+    "KimiK3ForConditionalGeneration": {"tier": "native", "min_ver": "0.5.17", "caveats": ["Day-0 지원 v0.5.17 — DCP+DSpark 스펙 디코딩, chunked-prefill PP+TP 디코드, KDA-aware prefix caching, HiCache L2, 양자화 가중치 위 LoRA · NVIDIA GB300·AMD MI35X 검증"]},
     "LlamaForCausalLM": {"tier": "native"},
     "Llama4ForConditionalGeneration": {"tier": "native", "caveats": ["멀티모달 Llama 4 — 비전 경로 포함"]},
     "MistralForCausalLM": {"tier": "native"},
@@ -55,15 +56,15 @@
   "versions": [
     {
       "version": "0.5",
-      "latest_patch": "0.5.16",
+      "latest_patch": "0.5.17",
       "released": "2026-07",
       "docs": "https://docs.sglang.ai/supported_models.html",
       "highlights": [
+        {"ko": "Kimi K3(2.8T 파라미터 · 896-expert LatentMoE top-16 · 3584차원 latent space · 69 KDA 선형어텐션+24 MLA 레이어 혼합 · 1M 컨텍스트) Day-0 지원 — DCP+DSpark 스펙 디코딩, KDA-aware prefix caching, HiCache L2 v0.5.17 · DWDP(MoE prefill용 NVLink P2P 전문가 가중치 프리페치로 EP all-to-all 제거, 4×B200 gpt-oss-120b서 DEP4 대비 1.92배) v0.5.17", "en": "Kimi K3 (2.8T-param, 896-expert LatentMoE top-16, 3584-dim latent space, 69 KDA linear-attention layers interleaved with 24 MLA layers, 1M-token context) day-0 support — DCP+DSpark speculative decoding, KDA-aware prefix caching, HiCache L2 in v0.5.17 · DWDP (NVLink P2P expert-weight prefetch for MoE prefill, removes EP all-to-all; 1.92x over DEP4 on 4x B200 gpt-oss-120b) in v0.5.17"},
         {"ko": "DSpark 신뢰도기반 스펙 디코딩(고정 draft 길이 대신 draft confidence로 verify window 크기 결정, DeepSeek-V4-Pro TP8 B300서 383.7 tok/s @accept~5) v0.5.16 · Inkling(975B 멀티모달 MoE, sliding-window+full+Mamba2 혼합 attention) Day-0 지원 v0.5.16", "en": "DSpark confidence-driven speculative decoding (verify window sized from draft confidence instead of fixed length; 383.7 tok/s @accept~5 on DeepSeek-V4-Pro TP8 B300) in v0.5.16 · Inkling (975B multimodal MoE mixing sliding-window/full/Mamba2 attention) Day-0 support in v0.5.16"},
-        {"ko": "DeepSeek V4 풀 인퍼런스 스택(텐서/전문가/컨텍스트 병렬 + 분리서빙, DeepGemm·FlashMLA 커널) v0.5.12 · GLM-5.2 NVFP4 Blackwell 튜닝(B300/GB300) v0.5.15", "en": "DeepSeek V4 full inference stack (tensor/expert/context parallel + disaggregation, DeepGemm/FlashMLA kernels) in v0.5.12 · GLM-5.2 NVFP4 tuned for Blackwell (B300/GB300) in v0.5.15"},
         {"ko": "UnifiedRadixTree가 SWA/Mamba/DSA 모델 기본 캐시로 전환 + GLM-5.2 prefill CP에서 KV/indexer 캐시 레이어 분할로 랭크당 메모리 ~74%↓ v0.5.16", "en": "UnifiedRadixTree becomes the default cache for SWA/Mamba/DSA models + GLM-5.2 prefill-CP KV/indexer cache layer split cuts per-rank memory ~74% v0.5.16"}
       ],
-      "notable_flags": ["--tool-call-parser", "--reasoning-parser", "--enable-dp-attention", "--quantization mxfp4"]
+      "notable_flags": ["--tool-call-parser", "--reasoning-parser", "--enable-dp-attention", "--quantization mxfp4", "--dcp-comm-backend", "--dwdp-size"]
     },
     {
       "version": "0.4",
@@ -94,6 +95,7 @@
     "_note": "SGLang 툴 콜링은 --tool-call-parser <parser>, thinking 모델은 --reasoning-parser <parser>를 함께 줍니다. parser 이름은 vLLM과 다릅니다(SGLang은 qwen25·deepseekv3·gpt-oss 식 표기). 릴리스마다 추가 — 최신 문서 확인.",
     "_default": {"tool_parser": null, "reasoning_parser": null, "note": {"ko": "이 아키텍처의 SGLang 네이티브 툴 파서는 미확인 — chat_template와 SGLang 문서에서 --tool-call-parser 값을 확인하세요.", "en": "No confirmed SGLang native tool parser for this architecture — check the chat_template and SGLang docs for --tool-call-parser."}},
     "InklingForConditionalGeneration": {"tool_parser": "inkling", "reasoning_parser": "inkling", "note": {"ko": "SGLang day-0 네이티브 지원 — --tool-call-parser inkling --reasoning-parser inkling (vLLM과 동일 파서명, SGLang 공식 쿡북 확인).", "en": "SGLang day-0 native support — --tool-call-parser inkling --reasoning-parser inkling (same parser name as vLLM, confirmed via SGLang official cookbook)."}},
+    "KimiK3ForConditionalGeneration": {"tool_parser": "kimi_k3", "reasoning_parser": "kimi_k3", "note": {"ko": "SGLang day-0 네이티브 지원 v0.5.17 — --tool-call-parser kimi_k3 --reasoning-parser kimi_k3 (SGLang 공식 쿡북 확인).", "en": "SGLang day-0 native support in v0.5.17 — --tool-call-parser kimi_k3 --reasoning-parser kimi_k3 (confirmed via SGLang official cookbook)."}},
     "LlamaForCausalLM": {"tool_parser": "llama3", "reasoning_parser": null},
     "Llama4ForConditionalGeneration": {"tool_parser": "llama3", "reasoning_parser": null},
     "MistralForCausalLM": {"tool_parser": "mistral", "reasoning_parser": null},
