@@ -291,6 +291,16 @@ ok("the UI renders all three engine panels", /ENGINE_PANELS/.test(app) &&
   /panelMPytorch/.test(html) && /panelMVllm/.test(html) && /panelMTrt/.test(html));
 ok("the UI has a placement panel with a replica ladder",
   /panelMPlace/.test(html) && /mplaceLadder/.test(html) && /LLMCalc\.placement/.test(app));
+// The placement tab must draw the same per-GPU memory cards the LLM tab does — a bare list of
+// numbers is what this replaced, and it was unreadable.
+ok("placement draws per-GPU memory cards, not just text rows",
+  /id="mplaceNodeCards"/.test(html) && /ncard-stack/.test(app) && /mediaNodeSegments/.test(app));
+ok("placement cards carry a legend and a role per GPU",
+  /id="mplaceLegend"/.test(html) && /mplace\.role\.(replica|shard|idle)/.test(app));
+ok("placement cards are capped so a 32-GPU fleet does not render 32 identical cards",
+  /const CAP = \d+/.test(app) && /mplace\.cards\.more/.test(app));
+ok("the ladder shows throughput as bar length and hatches idle GPUs",
+  /lr-idle/.test(app) && /tpPct/.test(app));
 ok("no serving command is offered for an unsupported/unknown engine",
   /const dead = \["unsupported", "unknown"\]\.includes\(sup\.tier\)/.test(app));
 

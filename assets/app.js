@@ -565,6 +565,67 @@ function mediaInstanceThroughput(model) {
   return r && r.itemsPerHour != null ? { value: r.itemsPerHour, unit: unit + "/h", gpus: r.gpusNeeded } : { value: null, unit: "", gpus: r ? r.gpusNeeded : 1 };
 }
 
+// What actually sits on ONE device, split the way an instance is split across its GPUs.
+// This is the same picture the LLM tab draws; only the segments differ, because a diffusion
+// stack is backbone / text encoder / VAE+activations rather than weights / KV / overhead.
+function mediaNodeSegments(model, gpu) {
+  const r = isSpeech() ? state.lastSpeech : state.lastMedia;
+  if (!r) return null;
+  const G = r.gpusNeeded;
+  const usable = gpu.vram_gb;
+  const parts = isSpeech()
+    ? [{ cls: "dense", gb: r.weightsGB / G, label: tr("mplace.seg.weights") },
+       { cls: "overhead", gb: Math.max(0, r.vramTotal - r.weightsGB) / G, label: tr("mplace.seg.overhead") }]
+    : [{ cls: "dense", gb: r.backboneGB / G, label: tr("legend.backbone") },
+       { cls: "kv", gb: r.encoderGB / G, label: tr("legend.textenc") },
+       { cls: "overhead", gb: (r.vaeGB + r.activationGB) / G, label: tr("legend.vaeact") }];
+  const used = parts.reduce((a, x) => a + x.gb, 0);
+  return { parts, used, usable, free: Math.max(0, usable - used), over: used > usable, shards: G };
+}
+
+function mediaNodeCard(i, seg, gpu, role, roleCls) {
+  const scale = Math.max(seg.usable, seg.used) || 1;
+  const pct = v => `${Math.max(0, (v / scale) * 100)}%`;
+  const block = (gb, cls, label) => gb <= 0 ? "" :
+    `<div class="ncard-seg ${cls}" style="height:${pct(gb)}">` +
+    `${gb / scale > 0.085 ? `<span class="seg-label">${esc(label)}</span>` : ""}</div>`;
+  const idle = roleCls === "idle";
+  return `<div class="ncard${seg.over ? " over" : ""}">
+    <div class="ncard-head">GPU ${i + 1} <span class="ncard-role ${roleCls}">${esc(role)}</span></div>
+    <div class="ncard-stack">
+      ${block(seg.free, "free", seg.free / scale > 0.12 ? `${fmt(seg.free, 0)} GB free` : "")}
+      ${idle ? "" : seg.parts.map(p => block(p.gb, p.cls, p.label)).join("")}
+    </div>
+    <div class="ncard-foot"><b class="${seg.over ? "over" : ""}">${fmt(idle ? 0 : seg.used, 1)}</b> / ${fmt(seg.usable, 0)} GB<br>
+      <span class="dim">${idle ? tr("mplace.card.idle") : fmt((seg.used / seg.usable) * 100, 0) + "% of VRAM"}</span></div>
+  </div>`;
+}
+
+function renderMediaNodeCards(model, gpu, p) {
+  const seg = mediaNodeSegments(model, gpu);
+  if (!seg) { el("mplaceNodeCards").innerHTML = ""; return; }
+  const CAP = 8;                                   // 32 identical cards helps nobody
+  const shown = Math.min(p.gpuCount, CAP);
+  const cards = [];
+  for (let i = 0; i < shown; i++) {
+    const inUse = i < p.replicas * p.gpusPerInstance;
+    const replica = Math.floor(i / p.gpusPerInstance) + 1;
+    const role = !inUse ? tr("mplace.role.idle")
+      : p.gpusPerInstance > 1
+        ? tr("mplace.role.shard", { r: replica, s: (i % p.gpusPerInstance) + 1, n: p.gpusPerInstance })
+        : tr("mplace.role.replica", { r: replica });
+    cards.push(mediaNodeCard(i, inUse ? seg : Object.assign({}, seg, { used: 0, free: seg.usable }),
+      gpu, role, inUse ? "" : "idle"));
+  }
+  el("mplaceNodeCards").innerHTML = cards.join("");
+  el("mplaceCardsHint").textContent = p.gpuCount > CAP
+    ? tr("mplace.cards.more", { n: p.gpuCount - CAP }) : "";
+  const dot = (c, t) => `<span class="dot" style="background:var(--${c})"></span>${t}`;
+  el("mplaceLegend").innerHTML = isSpeech()
+    ? dot("accent", tr("mplace.seg.weights")) + dot("o", tr("mplace.seg.overhead"))
+    : dot("accent", tr("legend.backbone")) + dot("k", tr("legend.textenc")) + dot("o", tr("legend.vaeact"));
+}
+
 function renderMediaPlacement() {
   const model = currentMediaModel();
   if (!model) return;
@@ -572,6 +633,7 @@ function renderMediaPlacement() {
   const per = mediaInstanceThroughput(model);
   const nodes = state.mplaceNodes;
   const p = LLMCalc.placement(nodes, per.gpus, per.value);
+  renderMediaNodeCards(model, gpu, p);
 
   el("mplaceModelName").innerHTML = `<a href="https://huggingface.co/${esc(model.hf)}" target="_blank" rel="noopener">${esc(model.name)}</a>`;
   el("mplaceChips").innerHTML = `<span class="chip">${esc(model.kind)}</span><span class="chip">${per.gpus} GPU / ${tr("mplace.instance")}</span>`;
@@ -591,18 +653,26 @@ function renderMediaPlacement() {
       ? `<div style="margin-top:6px">${tr("mplace.throughput", { v: fmt(p.throughput, p.throughput < 10 ? 1 : 0), unit: per.unit })}</div>`
       : `<div class="dim" style="margin-top:6px">${tr("mplace.nothroughput")}</div>`);
 
-  const ladder = [1, 2, 4, 8, 16, 32].map(n => {
+  // Bar length IS throughput (so the linear scaling is the shape you see), and any GPUs that
+  // cannot form a whole instance are hatched on at the end — that waste is the one thing a
+  // replica fleet gets wrong, and it should be visible rather than buried in a number.
+  const RUNGS = [1, 2, 4, 8, 16, 32];
+  const maxTp = Math.max(...RUNGS.map(n => LLMCalc.placement(n, per.gpus, per.value).throughput || 0)) || 1;
+  el("mplaceLadder").innerHTML = RUNGS.map(n => {
     const q = LLMCalc.placement(n, per.gpus, per.value);
-    const max = per.value != null ? per.value * Math.floor(32 / per.gpus) : 1;
-    const pct = q.throughput != null && max ? (q.throughput / max) * 100 : 0;
+    const tpPct = q.throughput != null ? (q.throughput / maxTp) * 100 : 0;
+    const idlePct = (q.idleGpus / n) * 100;                      // share of THIS fleet left over
     return `<button type="button" class="ladder-row${n === nodes ? " sel" : ""}" data-n="${n}" aria-pressed="${n === nodes}">
       <span class="lr-label">${n}× GPU</span>
-      <span class="lr-bar"><span class="lr-fit" style="width:${pct}%"></span></span>
-      <span class="lr-gb">${q.replicas} ${tr("mplace.rep")}</span>
-      <span class="lr-tok">${q.throughput != null ? fmt(q.throughput, q.throughput < 10 ? 1 : 0) : "—"}</span>
+      <span class="lr-bar" title="${q.replicas} × ${q.gpusPerInstance} GPU">
+        <span class="lr-fit" style="width:${tpPct}%"></span>
+        <span class="lr-idle" style="width:${Math.min(idlePct, 100 - tpPct)}%"></span>
+      </span>
+      <span class="lr-gb${q.shortOfOne ? " over" : ""}">${q.replicas}${tr("mplace.rep")}${
+        q.idleGpus > 0 ? `<span class="lr-idlen">+${q.idleGpus}</span>` : ""}</span>
+      <span class="lr-tok">${q.throughput != null ? fmt(q.throughput, q.throughput < 10 ? 1 : 0) + " " + per.unit : "—"}</span>
     </button>`;
   }).join("");
-  el("mplaceLadder").innerHTML = ladder;
 
   el("mplaceWhy").innerHTML = (isSpeech()
     ? [tr("mplace.why.speech1"), tr("mplace.why.speech2")]

@@ -214,9 +214,16 @@
         </div>
       </div>
       <div class="block"><div class="nums" id="mplaceSummary"></div></div>
+
       <div class="block">
-        <div class="block-title" data-i18n="mplace.ladder">GPU 수별 처리량</div>
-        <div id="mplaceLadder"></div>
+        <div class="block-title"><span data-i18n="mplace.nodemem">GPU별 메모리</span> <span class="dim" id="mplaceCardsHint"></span></div>
+        <div class="node-cards" id="mplaceNodeCards"></div>
+        <div class="legend node-legend" id="mplaceLegend"></div>
+      </div>
+
+      <div class="block">
+        <div class="block-title"><span data-i18n="mplace.ladder">GPU 수별 처리량</span> <span class="dim" data-i18n="mplace.ladderhint">— 막대 = 최대 대비 처리량 · 빗금 = 노는 GPU</span></div>
+        <div class="ladder" id="mplaceLadder"></div>
       </div>
       <div class="block">
         <div class="block-title" data-i18n="mplace.whytitle">왜 샤딩이 아니라 복제인가</div>
