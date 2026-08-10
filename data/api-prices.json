@@ -96,5 +96,54 @@
       "kind": "image",
       "note": "Per-image list price at 1K/2K output. Source: the image API table in data/speech.json (2026-07 official list price)."
     }
+  ],
+  "_note_speech": "Per-MINUTE prices for hosted speech APIs, USD per minute of audio — the unit STT/TTS vendors actually bill in. Derived from the curated table in data/speech.json (2026-07 official list prices); hourly quotes were divided by 60 and are marked. Rows priced per audio-token or per character do not convert to a per-minute figure without assuming a speaking rate, so they are omitted rather than estimated. Override with your own quote in the UI.",
+  "speech_presets": [
+    {
+      "label": "Custom — enter your own quote",
+      "provider": null,
+      "usd_per_min": null,
+      "kind": "any"
+    },
+    {
+      "label": "AssemblyAI Universal-2 (STT)",
+      "provider": "AssemblyAI",
+      "usd_per_min": 0.0025,
+      "kind": "stt",
+      "note": "Converted from the $0.15/hr list price."
+    },
+    {
+      "label": "ElevenLabs Scribe (STT)",
+      "provider": "ElevenLabs",
+      "usd_per_min": 0.00367,
+      "kind": "stt",
+      "note": "Converted from the $0.22/hr list price."
+    },
+    {
+      "label": "OpenAI whisper-1 (STT)",
+      "provider": "OpenAI",
+      "usd_per_min": 0.006,
+      "kind": "stt"
+    },
+    {
+      "label": "Deepgram Nova-3 (STT)",
+      "provider": "Deepgram",
+      "usd_per_min": 0.0077,
+      "kind": "stt",
+      "note": "Streaming tier."
+    },
+    {
+      "label": "Google STT Standard",
+      "provider": "Google",
+      "usd_per_min": 0.016,
+      "kind": "stt"
+    },
+    {
+      "label": "Cartesia Sonic (TTS)",
+      "provider": "Cartesia",
+      "usd_per_min": 0.038,
+      "kind": "tts",
+      "note": "Credit-based conversion, marked as an estimate in the source table."
+    }
   ]
 }

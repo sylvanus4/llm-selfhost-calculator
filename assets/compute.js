@@ -730,8 +730,134 @@
       monthlyNetSaving, paybackMonths, tcoSeries, overSubscribed, maxMonthlyItems };
   }
 
+  // ---- Speech: STT / TTS ----------------------------------------------------
+  //
+  // A third set of physics. The unit of work is a SECOND OF AUDIO, so the headline number is the
+  // real-time factor: how many seconds of audio you process per second of wall clock. Unlike
+  // diffusion, concurrency genuinely helps — these are ordinary transformer forwards that batch
+  // well (measured: Granite Speech 37.9× realtime at concurrency 1, 124× at concurrency 8).
+  const SPEECH_OVERHEAD_GB = 1.2;   // CUDA context + audio front-end buffers
+
+  // Real-time multiple at a requested concurrency, from up to two measured points.
+  // Between the points we interpolate on concurrency; past the measured ceiling we HOLD the last
+  // measured value rather than extrapolate, and say so — batching gains flatten and inventing
+  // headroom here would overstate a fleet's capacity.
+  function speechRealtime(m, concurrency, siblings) {
+    let src = m, scale = 1;
+    if (!m.measured && m.measured_from && siblings) {
+      const s = siblings.find(x => x.id === m.measured_from);
+      // Same architecture, different size: throughput scales roughly inversely with parameters.
+      if (s && s.measured && s.params_b && m.params_b) { src = s; scale = s.params_b / m.params_b; }
+    }
+    if (!src.measured) return { realtime: null, basis: "unmodelled", capped: false };
+    const b = src.measured;
+    const c1 = b.concurrency || 1, r1 = b.realtime_x;
+    const c2 = b.batched_concurrency, r2 = b.realtime_x_batched;
+    let r, capped = false;
+    if (!c2 || !r2 || concurrency <= c1) r = r1;
+    else if (concurrency >= c2) { r = r2; capped = concurrency > c2; }
+    else r = r1 + (r2 - r1) * ((concurrency - c1) / (c2 - c1));
+    const basis = src === m ? "measured" : "measured-sibling";
+    return { realtime: r * scale, basis, capped, measuredCeiling: c2 || c1 };
+  }
+
+  // `own` = { pricePerKwh, monthlyAudioHours, capexOverride?, powerOverride? }.
+  // `apiPerMin` is USD per minute of audio (how STT/TTS vendors actually price).
+  function computeSpeech(model, gpu, quant, opts) {
+    const o = opts || {};
+    const concurrency = Math.max(1, o.concurrency || 1);
+    const bpp = BYTES_PER_PARAM[quant];
+
+    const weightsGB = (model.params_b || 0) * bpp;
+    // Where we actually measured resident memory, trust that over the arithmetic.
+    const vramTotal = model.measured && model.measured.vram_gb
+      ? model.measured.vram_gb
+      : weightsGB + SPEECH_OVERHEAD_GB;
+    const fits = vramTotal <= gpu.vram_gb;
+    const gpusNeeded = Math.max(1, Math.ceil(vramTotal / gpu.vram_gb));
+
+    const rt = speechRealtime(model, concurrency, o.siblings);
+    // Scale across devices only by the FLOPS ratio to the device we measured on.
+    let realtime = rt.realtime;
+    if (realtime != null && o.refGpu && gpu.id !== o.refGpu.id) {
+      const tf = mediaTflops(gpu), refTf = mediaTflops(o.refGpu);
+      if (tf && refTf) realtime = realtime * (tf / refTf);
+      else realtime = null;
+    }
+    const audioHoursPerHour = realtime;                        // x realtime == audio-hours per wall hour
+    const secondsPerAudioMinute = realtime ? 60 / realtime : null;
+
+    const rent = o.rentOverride != null && !isNaN(o.rentOverride) ? o.rentOverride : gpu.rent_usd_hr;
+    let fleetRentHr = null, costPerAudioHour = null, costPerAudioMin = null,
+      apiPerAudioHour = null, verdict = null, savingPerAudioHour = null;
+    if (rent != null) {
+      fleetRentHr = rent * gpusNeeded;
+      if (realtime) { costPerAudioHour = fleetRentHr / realtime; costPerAudioMin = costPerAudioHour / 60; }
+    }
+    if (o.apiPerMin != null && !isNaN(o.apiPerMin)) {
+      apiPerAudioHour = o.apiPerMin * 60;
+      if (costPerAudioHour != null) {
+        savingPerAudioHour = apiPerAudioHour - costPerAudioHour;
+        verdict = costPerAudioHour <= apiPerAudioHour ? "self" : "api";
+      }
+    }
+
+    const own = o.own;
+    let ownAvailable = false, capexFleet = null, fleetKw = null, activeHours = null,
+      elecMonthly = null, apiMonthly = null, monthlyNetSaving = null, paybackMonths = null,
+      tcoSeries = null, overSubscribed = false, maxMonthlyAudioHours = null;
+    if (own && own.monthlyAudioHours > 0 && realtime) {
+      const unitPrice = own.capexOverride != null && !isNaN(own.capexOverride) ? own.capexOverride : gpu.price_usd;
+      const unitPower = own.powerOverride != null && !isNaN(own.powerOverride) ? own.powerOverride : gpu.power_w;
+      const kwh = own.pricePerKwh;
+      if (unitPrice != null && unitPower != null && kwh != null && !isNaN(kwh)) {
+        ownAvailable = true;
+        capexFleet = unitPrice * gpusNeeded;
+        fleetKw = (unitPower * gpusNeeded) / 1000;
+        activeHours = own.monthlyAudioHours / realtime;
+        maxMonthlyAudioHours = Math.floor(730 * realtime);
+        overSubscribed = activeHours > 730;
+        elecMonthly = fleetKw * activeHours * kwh;
+        apiMonthly = apiPerAudioHour != null ? own.monthlyAudioHours * apiPerAudioHour : null;
+        if (apiMonthly != null) {
+          monthlyNetSaving = apiMonthly - elecMonthly;
+          paybackMonths = monthlyNetSaving > 0 ? capexFleet / monthlyNetSaving : null;
+          tcoSeries = [];
+          for (let mo = 0; mo <= 36; mo++)
+            tcoSeries.push({ month: mo, selfhost: capexFleet + elecMonthly * mo, api: apiMonthly * mo });
+        }
+      }
+    }
+
+    return { bpp, weightsGB, vramTotal, fits, gpusNeeded, totalVram: gpusNeeded * gpu.vram_gb,
+      concurrency, realtime, audioHoursPerHour, secondsPerAudioMinute,
+      speedBasis: realtime == null ? (rt.basis === "unmodelled" ? "unmodelled" : "unknown") : rt.basis,
+      concurrencyCapped: rt.capped, measuredCeiling: rt.measuredCeiling,
+      rent, fleetRentHr, costPerAudioHour, costPerAudioMin, apiPerAudioHour, savingPerAudioHour, verdict,
+      ownAvailable, capexFleet, fleetKw, activeHours, elecMonthly, apiMonthly,
+      monthlyNetSaving, paybackMonths, tcoSeries, overSubscribed, maxMonthlyAudioHours };
+  }
+
+  // ---- Placement across a fleet (image / video / speech) ---------------------
+  // The LLM tab asks "how do I shard ONE model across nodes". For these modalities the more
+  // useful question is the opposite: one instance usually fits on one device, so a fleet runs
+  // REPLICAS. That matters most for diffusion, where batching buys ~6-10% but a second replica
+  // buys 100%. Reports the leftover devices too — a fleet that cannot divide evenly wastes them.
+  function placement(gpuCount, gpusPerInstance, perInstanceThroughput) {
+    const n = Math.max(1, gpuCount), per = Math.max(1, gpusPerInstance);
+    const replicas = Math.floor(n / per);
+    const idle = n - replicas * per;
+    return {
+      gpuCount: n, gpusPerInstance: per, replicas, idleGpus: idle,
+      shortOfOne: replicas === 0,
+      throughput: replicas > 0 && perInstanceThroughput != null ? perInstanceThroughput * replicas : null,
+      utilization: n > 0 ? (replicas * per) / n : 0,
+    };
+  }
+
   const api = { compute, BYTES_PER_PARAM, KV_BYTES, MBU, BATCH_EFF,
     computeMedia, mediaLatentTokens, mediaFlops, mediaSeconds, mediaTflops, mediaAnchor,
+    computeSpeech, speechRealtime, placement, SPEECH_OVERHEAD_GB,
     MEDIA_MFU, MEDIA_ACT_BASE_GB, MEDIA_ACT_BUFFERS,
     engineVersionHistory, toolCallingConfig, toolFlagsFor,
     normalizeHfRef, vllmVerdict, buildServingSpec, servedName, vllmQuantFlag, detectQuantMethod,

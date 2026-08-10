@@ -25,7 +25,7 @@ jobs:
         run: node test/versions-tools.test.cjs
       - name: Unit test new-model builder (offline fixtures, no fabrication)
         run: node test/add-model.test.cjs
-      - name: Unit test image/video (diffusion) core, dataset and honesty rails
+      - name: Unit test image/video/speech cores, datasets, serving matrix, honesty rails
         run: node test/media.test.cjs
       - name: Health audit (structural — no error-severity problems)
         run: node test/health-audit.test.cjs
@@ -75,4 +75,9 @@ jobs:
           grep -q 'id="panelMedia"' index.html
           grep -q 'id="catToggle"' index.html
           grep -q 'data-panel="media"' index.html
+          grep -q 'id="panelMPlace"' index.html
+          grep -q 'id="panelMPytorch"' index.html
+          grep -q 'id="panelMVllm"' index.html
+          grep -q 'id="panelMTrt"' index.html
+          grep -q 'value="speech"' index.html
           echo "html wiring ok"

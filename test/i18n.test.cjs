@@ -59,10 +59,25 @@ for (const m of mediaModels) {
   if (m.blocked && m.blocked.reason) surface.add(m.blocked.reason);
 }
 
+// Speech models + the non-LLM serving matrix: notes, blocked reasons and every engine caveat
+// render in the media/speech panels.
+const speechModels = JSON.parse(fs.readFileSync(path.join(root, "data/speech-models.json"))).models;
+for (const m of speechModels) {
+  if (m.note) surface.add(m.note);
+  if (m.blocked && m.blocked.reason) surface.add(m.blocked.reason);
+}
+const serving = JSON.parse(fs.readFileSync(path.join(root, "data/serving-support.json")));
+const hangul = /[가-힣]/;
+for (const entry of Object.values(serving.models || {}))
+  for (const sup of Object.values(entry))
+    for (const c of sup.caveats || []) if (hangul.test(c)) surface.add(c);
+for (const e of Object.values(serving.engines || {})) if (e.note && hangul.test(e.note)) surface.add(e.note);
+for (const v of Object.values(serving.via_label || {})) if (hangul.test(v)) surface.add(v);
+
 // api-prices preset labels/notes render in a dropdown that is NOT re-rendered on toggle,
 // so they must be language-neutral (no Korean) rather than DATA-translated.
 const apiPrices = JSON.parse(fs.readFileSync(path.join(root, "data/api-prices.json")));
-const apiKo = [...(apiPrices.presets || []), ...(apiPrices.media_presets || [])]
+const apiKo = [...(apiPrices.presets || []), ...(apiPrices.media_presets || []), ...(apiPrices.speech_presets || [])]
   .filter(p => /[가-힣]/.test(JSON.stringify(p)));
 ok("no Korean in api-prices preset labels (dropdown isn't re-translated)", apiKo.length === 0);
 if (apiKo.length) apiKo.forEach(p => console.log("      - " + p.label));

@@ -189,5 +189,126 @@ ok("app loads the media dataset", /data\/media-models\.json/.test(app));
   ok(`every emitted speed basis has ko+en text (${[...emitted].join(", ")})`, gaps.length === 0, gaps.join(", "));
 }
 
-console.log(`\nmedia: ${pass} passed, ${fail} failed`);
+
+// ---- 7. speech (STT / TTS) -------------------------------------------------
+const speech = JSON.parse(fs.readFileSync(path.join(root, "data/speech-models.json"))).models;
+console.log("\nspeech gate:");
+ok("speech dataset is non-empty", speech.length > 0);
+ok("speech ids are unique", new Set(speech.map(m => m.id)).size === speech.length);
+ok("every speech model is stt or tts", speech.every(m => m.kind === "stt" || m.kind === "tts"));
+ok("both stt and tts are populated",
+  speech.some(m => m.kind === "stt") && speech.some(m => m.kind === "tts"));
+ok("every speech model has params, hf and a licence url",
+  speech.every(m => m.params_b > 0 && m.hf && m.license_url));
+ok("params_source is declared (registry-derived vs card-quoted)",
+  speech.every(m => ["registry", "card"].includes(m.params_source)));
+ok("speech measured_from targets are themselves measured",
+  speech.filter(m => m.measured_from).every(m => {
+    const sib = speech.find(x => x.id === m.measured_from);
+    return sib && sib.measured;
+  }));
+ok("runtime-blocked speech models carry a reason",
+  speech.filter(m => m.blocked).every(m => m.blocked.kind && m.blocked.reason));
+
+// Reproduce each anchor at its own concurrency on the device it was measured on.
+for (const m of speech.filter(x => x.measured)) {
+  const b = m.measured;
+  const r = C.computeSpeech(m, REF, "fp16", { concurrency: b.concurrency || 1, refGpu: REF, siblings: speech });
+  ok(`${m.id}: reproduces its ${b.realtime_x}x realtime benchmark`,
+    Math.abs(r.realtime - b.realtime_x) < 1e-9, `got ${r.realtime}`);
+  if (b.realtime_x_batched) {
+    const rb = C.computeSpeech(m, REF, "fp16", { concurrency: b.batched_concurrency, refGpu: REF, siblings: speech });
+    ok(`${m.id}: reproduces its batched ${b.realtime_x_batched}x`,
+      Math.abs(rb.realtime - b.realtime_x_batched) < 1e-9, `got ${rb.realtime}`);
+  }
+}
+// Past the measured ceiling we must HOLD, not extrapolate.
+{
+  const m = speech.find(x => x.measured && x.measured.batched_concurrency);
+  const at = c => C.computeSpeech(m, REF, "fp16", { concurrency: c, refGpu: REF, siblings: speech });
+  const ceil = m.measured.batched_concurrency;
+  ok("concurrency past the measured ceiling is held, not extrapolated",
+    at(ceil * 8).realtime === at(ceil).realtime && at(ceil * 8).concurrencyCapped === true);
+  ok("concurrency between measured points interpolates upward",
+    at(ceil).realtime > at(Math.ceil((1 + ceil) / 2)).realtime && at(Math.ceil((1 + ceil) / 2)).realtime > at(1).realtime);
+}
+for (const m of speech) {
+  const r = C.computeSpeech(m, g("h200"), "fp16", { concurrency: 1, refGpu: REF, siblings: speech });
+  const anchored = !!(m.measured || m.measured_from);
+  ok(`${m.id}: speech speed basis is honest (${r.speedBasis})`, anchored === /^measured/.test(r.speedBasis));
+  ok(`${m.id}: VRAM is always produced`, r.vramTotal > 0);
+}
+// Where we measured resident memory, the model must report that rather than the arithmetic.
+{
+  const m = speech.find(x => x.measured && x.measured.vram_gb);
+  const r = C.computeSpeech(m, REF, "fp16", { concurrency: 1, refGpu: REF, siblings: speech });
+  ok(`${m.id}: uses measured resident VRAM`, r.vramTotal === m.measured.vram_gb);
+}
+// A model slower than realtime must surface as such — that is the whole point for TTS.
+{
+  const slow = speech.find(x => x.measured && x.measured.realtime_x < 1);
+  ok("a below-realtime TTS exists and is reported below 1x", !!slow &&
+    C.computeSpeech(slow, REF, "fp16", { concurrency: 1, refGpu: REF, siblings: speech }).realtime < 1);
+}
+
+// ---- 8. serving-support matrix --------------------------------------------
+const serving = JSON.parse(fs.readFileSync(path.join(root, "data/serving-support.json")));
+const ENGINES = ["pytorch", "vllm", "tensorrt"];
+const TIERS = ["native", "partial", "custom", "transformers", "unsupported", "unknown", "incompatible"];
+console.log("\nserving-matrix gate:");
+const allModelIds = [...media.map(m => m.id), ...speech.map(m => m.id)];
+ok("every image/video/speech model has a serving entry",
+  allModelIds.every(id => serving.models[id]),
+  allModelIds.filter(id => !serving.models[id]).join(", "));
+ok("no serving entry for a model that does not exist",
+  Object.keys(serving.models).every(id => allModelIds.includes(id)),
+  Object.keys(serving.models).filter(id => !allModelIds.includes(id)).join(", "));
+ok("every model is judged on all three engines",
+  Object.values(serving.models).every(e => ENGINES.every(k => e[k] && e[k].tier)));
+ok("every tier is from the known set",
+  Object.values(serving.models).every(e => ENGINES.every(k => TIERS.includes(e[k].tier))));
+// The core-vs-Omni and the three-TensorRT-repo distinctions are the whole point of `via`.
+ok("every non-pytorch supported entry names which engine variant it came from",
+  Object.values(serving.models).every(e => ["vllm", "tensorrt"].every(k =>
+    ["unsupported", "unknown"].includes(e[k].tier) || e[k].via)));
+ok("every `via` is declared in via_label",
+  Object.values(serving.models).every(e => ENGINES.every(k => !e[k].via || serving.via_label[e[k].via])));
+// A claim of support must carry evidence or a pointer, never a bare assertion.
+ok("supported entries carry either caveats or a docs link",
+  Object.values(serving.models).every(e => ENGINES.every(k =>
+    !["native", "partial", "custom"].includes(e[k].tier) || (e[k].caveats && e[k].caveats.length) || e[k].docs || e[k].pipeline || e[k].lib)));
+ok("vLLM diffusion support is attributed to vLLM-Omni, never to vLLM core",
+  media.every(m => {
+    const v = serving.models[m.id].vllm;
+    return ["unsupported", "unknown"].includes(v.tier) || v.via === "vllm-omni";
+  }));
+ok("vLLM ASR support is attributed to vLLM core",
+  speech.filter(m => m.kind === "stt").every(m => {
+    const v = serving.models[m.id].vllm;
+    return ["unsupported", "unknown"].includes(v.tier) || v.via === "vllm";
+  }));
+ok("the UI renders all three engine panels", /ENGINE_PANELS/.test(app) &&
+  /panelMPytorch/.test(html) && /panelMVllm/.test(html) && /panelMTrt/.test(html));
+ok("the UI has a placement panel with a replica ladder",
+  /panelMPlace/.test(html) && /mplaceLadder/.test(html) && /LLMCalc\.placement/.test(app));
+ok("no serving command is offered for an unsupported/unknown engine",
+  /const dead = \["unsupported", "unknown"\]\.includes\(sup\.tier\)/.test(app));
+
+// ---- 9. placement ----------------------------------------------------------
+console.log("\nplacement gate:");
+{
+  const p1 = C.placement(8, 1, 100);
+  ok("8 GPUs, 1 per instance -> 8 replicas at 8x throughput",
+    p1.replicas === 8 && p1.throughput === 800 && p1.idleGpus === 0);
+  const p2 = C.placement(7, 2, 100);
+  ok("7 GPUs, 2 per instance -> 3 replicas and 1 idle",
+    p2.replicas === 3 && p2.idleGpus === 1 && p2.throughput === 300);
+  const p3 = C.placement(1, 2, 100);
+  ok("a fleet too small for one instance is flagged, not silently zeroed",
+    p3.shortOfOne === true && p3.replicas === 0 && p3.throughput === null);
+  ok("throughput is null when per-instance throughput is unknown",
+    C.placement(8, 1, null).throughput === null);
+}
+
+console.log(`\nmedia+speech+serving: ${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

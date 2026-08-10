@@ -160,6 +160,60 @@ if (doNetwork) {
   if (!anchored) add("warn", "F7", "no media model has a measurement anchor", "every latency would be a roofline guess");
 }
 
+// ---- F8: speech dataset + the non-LLM serving matrix ----------------------
+// The failure that matters here is a support CLAIM drifting away from its evidence: an entry
+// that says "native" with nothing backing it, or vLLM diffusion support attributed to vLLM core
+// when it actually comes from the separate vLLM-Omni project.
+{
+  const sp = read("data/speech-models.json").models;
+  const mm = read("data/media-models.json").models;
+  const sv = read("data/serving-support.json");
+  const gpuIds = new Set(read("data/gpus.json").gpus.map(g => g.id));
+  const ENG = ["pytorch", "vllm", "tensorrt"];
+  const TIERS = ["native", "partial", "custom", "transformers", "unsupported", "unknown", "incompatible"];
+
+  const seen = new Set();
+  for (const m of sp) {
+    if (seen.has(m.id)) add("error", "F8", `speech model duplicate id "${m.id}"`, "ids must be unique");
+    seen.add(m.id);
+    if (!(m.params_b > 0)) add("error", "F8", `speech model "${m.id}": params_b missing`, "derive it from the staged weights or the model card");
+    if (!["registry", "card"].includes(m.params_source)) add("warn", "F8", `speech model "${m.id}": params_source not declared`, "say whether the size came from the registry or the card");
+    if (!m.license_url) add("warn", "F8", `speech model "${m.id}": no license_url`, "link the licence");
+    if (m.kind !== "stt" && m.kind !== "tts") add("error", "F8", `speech model "${m.id}": kind must be stt|tts`, "set kind");
+    if (m.measured) {
+      if (!gpuIds.has(m.measured.gpu)) add("error", "F8", `speech model "${m.id}": measured.gpu "${m.measured.gpu}" unknown`, "anchor must reference a device in gpus.json");
+      if (!(m.measured.realtime_x > 0)) add("error", "F8", `speech model "${m.id}": measurement has no realtime_x`, "record the measured real-time factor");
+      if (m.measured.realtime_x_batched && !m.measured.batched_concurrency)
+        add("error", "F8", `speech model "${m.id}": batched figure without its concurrency`, "a batched number is meaningless without the concurrency it was taken at");
+    }
+    if (m.measured && m.measured_from) add("error", "F8", `speech model "${m.id}": has both measured and measured_from`, "pick one");
+    if (m.measured_from) {
+      const sib = sp.find(x => x.id === m.measured_from);
+      if (!sib || !sib.measured) add("error", "F8", `speech model "${m.id}": measured_from "${m.measured_from}" has no measurement`, "point at a benchmarked sibling or drop it");
+    }
+    if (m.blocked && !m.blocked.reason) add("error", "F8", `speech model "${m.id}": blocked without a reason`, "'no runtime' is only useful with the why");
+  }
+
+  const ids = new Set([...sp.map(m => m.id), ...mm.map(m => m.id)]);
+  for (const id of ids) if (!sv.models[id]) add("error", "F8", `serving matrix has no entry for "${id}"`, "every image/video/speech model needs one");
+  for (const id of Object.keys(sv.models)) if (!ids.has(id)) add("error", "F8", `serving matrix has a stale entry "${id}"`, "the model no longer exists");
+  for (const [id, entry] of Object.entries(sv.models)) {
+    for (const k of ENG) {
+      const s = entry[k];
+      if (!s) { add("error", "F8", `serving "${id}": no ${k} verdict`, "judge every model on all three engines"); continue; }
+      if (!TIERS.includes(s.tier)) add("error", "F8", `serving "${id}".${k}: unknown tier "${s.tier}"`, `use one of ${TIERS.join("|")}`);
+      if (k !== "pytorch" && !["unsupported", "unknown"].includes(s.tier) && !s.via)
+        add("error", "F8", `serving "${id}".${k}: claims ${s.tier} without saying which engine variant`, "set via — vLLM core and vLLM-Omni are different projects, as are the three TensorRT repos");
+      if (s.via && !(sv.via_label || {})[s.via])
+        add("error", "F8", `serving "${id}".${k}: via "${s.via}" has no label`, "add it to via_label");
+      if (["native", "partial", "custom"].includes(s.tier) && !(s.caveats && s.caveats.length) && !s.docs && !s.pipeline && !s.lib)
+        add("warn", "F8", `serving "${id}".${k}: claims ${s.tier} with no evidence`, "add a caveat, a docs link, a pipeline class or a library");
+    }
+    if (mm.some(m => m.id === id) && entry.vllm.via && entry.vllm.via !== "vllm-omni")
+      add("error", "F8", `serving "${id}": diffusion vLLM support attributed to "${entry.vllm.via}"`, "core vLLM serves no diffusion — this must be vllm-omni");
+  }
+}
+
 const bySev = { error: 0, warn: 0, info: 0 };
 findings.forEach(f => bySev[f.severity]++);
 const report = { generated_utc: new Date().toISOString(), network: doNetwork, counts: bySev, findings };

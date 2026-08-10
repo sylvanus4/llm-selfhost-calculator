@@ -41,6 +41,33 @@
 
 데이터는 `data/media-models.json`이며, 파라미터 수는 홍보 자료가 아니라 **실제 스테이징된 가중치**(safetensors 인덱스·샤드 크기)를 on-disk dtype으로 나눠 도출했습니다.
 
+## 음성 STT · TTS · Speech
+
+`모델 종류`를 **음성 STT·TTS**로 바꾸면 다시 다른 계산기가 됩니다. 음성의 작업 단위는 토큰도 디노이징 스텝도 아닌 **오디오 1초**라, 헤드라인 숫자는 **실시간 배수(RTF)** — 벽시계 1초에 오디오 몇 초를 처리하느냐입니다.
+
+디퓨전과 결정적으로 다른 점은 **동시성이 실제로 듣는다**는 것입니다. 평범한 트랜스포머 forward라 배칭이 잘 먹혀서, 실측에서 Granite Speech는 동시성 1에서 실시간 37.9배, 동시성 8에서 124배가 나왔습니다. 그래서 노드별 배치 탭도 "복제를 늘리기 전에 동시성부터 올려라"로 안내합니다. 다만 **실측한 동시성 범위를 넘어가면 외삽하지 않고 마지막 실측값을 유지**하고 그 사실을 표시합니다 — 배칭 이득은 어디선가 평평해지는데 그 지점을 모르는 채 여유를 지어내면 함대 용량을 과대평가하게 됩니다.
+
+TTS에서 가장 중요한 판정은 **실시간에 도달하느냐**입니다. VoxCPM 1.5는 실시간 36배(1분 음성을 1.7초에)인 반면 Chatterbox는 0.78배로 **실시간에 못 미칩니다**(1분에 77초). 이 목록에서 가장 작은 모델이 가장 느립니다 — 작은 모델을 고르는 것과 실시간 합성을 얻는 것은 별개입니다.
+
+런타임이 아예 없는 모델은 그 사실을 1급 정보로 표시합니다. Qwen3-TTS는 transformers에 모델 타입이 없고, CosyVoice3는 torch 세대 불일치로 합성이 깨지며, Nemotron ASR은 스트리밍 전용이라 배치 전사가 불가능합니다 — 셋 다 모델 카드에는 없는 사실이고, 음성 모델을 고를 때 가장 먼저 알아야 할 것입니다.
+
+## 서빙 준비도 4탭 · Serving readiness
+
+이미지·영상·음성에도 LLM과 같은 서빙 탭이 붙습니다 — **노드별 배치 · PyTorch · vLLM · TensorRT**. 여기서는 엔진 이름의 구분이 평소보다 훨씬 중요합니다.
+
+| 엔진 | 무엇이 실제로 지원하나 |
+|---|---|
+| **PyTorch** | 이미지·영상은 diffusers, 음성은 transformers 또는 모델 전용 패키지. **둘 다 HTTP 서버를 내장하지 않습니다** — 직접 감싸야 합니다 |
+| **vLLM 코어** | 입력 오디오 ASR만(`/v1/audio/transcriptions`). 디퓨전도 TTS도 **서빙하지 않습니다** |
+| **vLLM-Omni** | 별도 공식 확장. 디퓨전과 TTS를 여기서 서빙합니다 — 이걸 "vLLM 지원"이라고 뭉뚱그리면 틀립니다 |
+| **TensorRT-LLM VisualGen** | 2026-02 도입 베타. Qwen-Image 3종·Wan 2.2 T2V/I2V가 정확한 이름으로 등재 |
+| **TensorRT demo/Diffusion** | 별개의 구형 엔진 빌드 경로. SDXL·Wan 2.2. 해상도·배치가 엔진에 고정 |
+| **TensorRT-Edge-LLM** | 세 번째 저장소(Jetson·DRIVE). Qwen3-ASR·Qwen3-TTS가 NVIDIA 스택에서 등장하는 유일한 곳 |
+
+판정 등급은 **native**(엔진 자체 지원표에 정확한 체크포인트 이름으로 등재) · **partial**(계열은 있으나 우리 리비전·포맷이 아니거나 조건부) · **custom**(범용 엔진이 아니라 벤더 자체 경로) · **unsupported**(지원 목록에 명시적으로 없음) · **unknown**(확인 불가 — 추측하지 않음)입니다. 지원이 확인되지 않은 엔진에는 **실행 코드를 제공하지 않습니다**.
+
+이 매트릭스에서 나온 실질적 발견 하나: 로컬에서 실행이 막혀 있던 **CosyVoice3와 Qwen3-TTS가 vLLM-Omni에는 정확히 그 체크포인트로 등재**돼 있습니다. 우리 백로그의 "실행 불가"를 우회할 후보 경로입니다(미검증으로 표시).
+
 ## vLLM 서빙 준비도 · vLLM Ready Check
 
 두 번째 탭 **"vLLM 서빙 준비도"** 는 "이 모델, vLLM에서 바로 서빙되나?"에 답하고 **바로 쓰는 배포 매니페스트**를 생성합니다.
@@ -100,7 +127,7 @@ python3 -m http.server 8000    # file:// 는 fetch가 막히므로 반드시 서
 
 ```bash
 node test/compute.test.cjs      # 가중치 수식·적합성·MoE 속도·임대 손익분기·구매 회수 등 속성 검증
-node test/media.test.cjs        # 디퓨전 코어 — 자체 벤치마크 재현, VRAM 오차 8% 이내, 정직성 레일
+node test/media.test.cjs        # 디퓨전·음성 코어 + 서빙 매트릭스 — 벤치마크 재현, VRAM 오차 8% 이내, 정직성 레일
 ```
 
 CI(`.github/workflows/validate.yml`)가 매 푸시마다 이 테스트 + JSON/HTML 파싱을 검증합니다.
@@ -117,7 +144,7 @@ CI(`.github/workflows/validate.yml`)가 매 푸시마다 이 테스트 + JSON/HT
 
 ## 데이터 추가
 
-`data/models.json`·`data/media-models.json`(이미지·영상)·`data/gpus.json`·`data/api-prices.json`에 항목을 추가하면 UI에 즉시 반영됩니다. 값은 공개 스펙 기반 근사이며, PR 환영합니다.
+`data/models.json`·`data/media-models.json`(이미지·영상)·`data/speech-models.json`(STT·TTS)·`data/serving-support.json`(엔진 지원)·`data/gpus.json`·`data/api-prices.json`에 항목을 추가하면 UI에 즉시 반영됩니다. 값은 공개 스펙 기반 근사이며, PR 환영합니다.
 
 ## Security & Privacy / 보안과 개인정보
 

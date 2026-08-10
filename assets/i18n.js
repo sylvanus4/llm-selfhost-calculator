@@ -7,10 +7,10 @@
   const UI = {
     ko: {
       // document
-      "doc.title": "자체 호스팅 계산기 · LLM·이미지·영상 생성 모델의 VRAM·비용·서빙 준비도 (docker-compose·K8s 매니페스트)",
+      "doc.title": "자체 호스팅 계산기 · LLM·이미지·영상·음성 모델의 VRAM·비용·서빙 준비도 (vLLM·TensorRT·PyTorch)",
       "doc.desc": "이 LLM, 내 GPU/맥에서 돌아갈까? API보다 쌀까? vLLM·SGLang·TensorRT-LLM에서 네이티브로 서빙되나? VRAM 적합성·토큰속도·손익분기 계산 + 노드별 배치 + 세 엔진 서빙 지원 판정(모델·양자화·하드웨어별) + 바로 쓰는 docker-compose·Kubernetes 매니페스트 생성을 브라우저에서 즉시. 키 없음, 데이터 전송 없음.",
       "h1": "LLM 자체 호스팅 계산기",
-      "sub": "이 모델, 내 하드웨어에서 돌아갈까? API보다 쌀까? — <b>텍스트 LLM · 이미지 생성 · 영상 생성</b>의 VRAM 적합성 · 속도 · 손익분기를 즉시 계산합니다. <b>키 없음 · 서버 없음 · 데이터 전송 없음.</b>",
+      "sub": "이 모델, 내 하드웨어에서 돌아갈까? API보다 쌀까? — <b>텍스트 LLM · 이미지 생성 · 영상 생성 · 음성 STT/TTS</b>의 VRAM 적합성 · 속도 · 손익분기를 즉시 계산합니다. <b>키 없음 · 서버 없음 · 데이터 전송 없음.</b>",
       "ctrl.lang": "언어",
       "ctrl.theme": "테마",
       "theme.dark": "다크",
@@ -52,6 +52,78 @@
       "legend.kv": "KV캐시",
       "legend.overhead": "오버헤드",
       "legend.vramcap": "장비 VRAM 한계",
+      // --- speech (STT/TTS) + placement + serving tabs ---
+      "cat.speech": "음성 STT·TTS",
+      "lbl.maudio": "월 예상 오디오 처리량",
+      "lbl.api.min": "비교 API 단가 ($/오디오 분)",
+      "tab.mplace": "노드별 배치",
+      "tab.mpytorch": "PyTorch 서빙",
+      "tab.mvllm": "vLLM 서빙 준비도",
+      "tab.mtrt": "TensorRT 서빙",
+      "speech.chip.stt": "음성 인식 STT",
+      "speech.chip.tts": "음성 합성 TTS",
+      "speech.realtime": "실시간 대비",
+      "speech.perminute": "오디오 1분을 {s}초에 처리",
+      "speech.belowrealtime": "⚠️ 실시간 미달 — 스트리밍 용도로는 부적합",
+      "speech.audiohours": "오디오-시간/시간",
+      "speech.audiohour": "오디오-시간",
+      "speech.batchnote": "동시성을 올리면 더 올라갑니다 — 디퓨전과 달리 음성은 배칭이 실제로 듣습니다.",
+      "speech.capped": "동시성 {c}까지만 실측했습니다. 그 이상은 외삽하지 않고 마지막 실측값을 유지합니다.",
+      "speech.nospeed": "이 모델은 자체 실측치가 없어 속도를 계산하지 않습니다. VRAM 적합성은 그대로 유효합니다.",
+      "speech.noruntime": "⛔ 현재 이 모델을 돌릴 런타임이 없습니다",
+      "speech.vram.line": "가중치 <b>{w}GB</b> + 런타임 오버헤드 <b>{o}GB</b> = <b>{tot}GB</b>",
+      "speech.vram.measured": "이 수치는 계산값이 아니라 실제로 측정한 상주 메모리입니다.",
+      "speech.maudiolab": "월 {n} 오디오-시간",
+      "speech.cost.self": "자체 호스팅 원가",
+      "speech.cost.permin": "오디오 1분당",
+      "speech.cost.noapi": "비교할 API 단가를 입력하면 손익을 계산합니다.",
+      "speech.cost.cheaper": "✅ 자체 호스팅이 오디오-시간당 ${v} 저렴합니다",
+      "speech.cost.apicheaper": "⚠️ API가 오디오-시간당 ${v} 저렴합니다",
+      "speech.own.oversub": "⚠️ 이 장비로는 월 최대 {max} 오디오-시간까지만 가능합니다.",
+      "speech.method.anchor": "기준점: {src}를 {gpu}에서 {engine}으로 돌린 실시간 {x}배(동시성 {c}).",
+      "speech.method.batched": "동시성 {c}에서는 실시간 {x}배까지 올랐습니다.",
+      "speech.method.wer": "같은 실행의 WER {w}% (동시성 상향 시 {wb}%).",
+      "speech.method.sibling": "이 모델 자체는 측정하지 않았고, 같은 아키텍처의 측정치를 파라미터 비율로 환산했습니다.",
+      "speech.method.scaled": "{gpu}의 연산 성능비로 환산했습니다.",
+      "speech.method.none": "자체 실측치가 없어 속도를 추정하지 않습니다 — 이 모델은 VRAM만 계산합니다.",
+      "mplace.gpus": "GPU 수",
+      "mplace.instance": "인스턴스",
+      "mplace.rep": "복제",
+      "mplace.replicas": "복제 {r}개",
+      "mplace.short": "GPU {n}장이 있어야 1개 인스턴스가 뜹니다",
+      "mplace.summary": "GPU <b>{n}</b>장 · 인스턴스당 <b>{per}</b>장 → 복제 <b>{r}</b>개",
+      "mplace.idle": "⚠️ {i}장이 남아 놉니다 — 인스턴스당 GPU 수로 나누어떨어지지 않습니다.",
+      "mplace.shortnote": "⚠️ 이 모델은 인스턴스 하나에 GPU {n}장이 필요합니다 — 지금 선택으로는 한 개도 못 띄웁니다.",
+      "mplace.throughput": "합계 처리량 <b>{v}</b> {unit}",
+      "mplace.nothroughput": "속도를 산출하지 못해 합계 처리량을 낼 수 없습니다.",
+      "mplace.ladder": "GPU 수별 처리량",
+      "mplace.whytitle": "왜 샤딩이 아니라 복제인가",
+      "mplace.why.media1": "LLM 탭은 모델 하나를 여러 장에 <b>쪼개는</b> 문제를 풉니다. 디퓨전은 대개 한 장에 들어가므로 반대 질문이 됩니다 — 몇 개를 <b>복제</b>할 것인가.",
+      "mplace.why.media2": "실측에서 배치를 키우면 6~10%만 빨라지는데 VRAM은 1.5배가 됩니다. 반면 GPU를 한 장 더 쓰면 처리량이 그대로 2배가 됩니다. 디퓨전에서는 배칭이 아니라 복제가 정답입니다.",
+      "mplace.why.speech1": "음성 모델은 몇 GB짜리라 거의 항상 한 장에 들어갑니다. 규모를 키우는 방법은 샤딩이 아니라 복제입니다.",
+      "mplace.why.speech2": "다만 디퓨전과 달리 인스턴스 <b>안에서</b> 동시성을 올리는 것도 효과가 있습니다(실측 Granite 37.9배→124배). 복제를 늘리기 전에 동시성부터 올리는 편이 쌉니다.",
+      "rd.tier.native": "네이티브 지원",
+      "rd.tier.partial": "부분 지원 — 확인 필요",
+      "rd.tier.custom": "벤더 자체 경로",
+      "rd.tier.transformers": "Transformers 백엔드",
+      "rd.tier.unsupported": "미지원",
+      "rd.tier.unknown": "판정 불가",
+      "rd.tier.incompatible": "하드웨어 미지원",
+      "serve.cmd": "서빙 코드",
+      "serve.via": "경로",
+      "serve.lib": "라이브러리",
+      "serve.pipeline": "파이프라인 클래스",
+      "serve.arch": "아키텍처",
+      "serve.servedid": "서빙 대상 체크포인트",
+      "serve.docs": "지원 목록 원문 보기",
+      "serve.nodata": "이 모델에 대한 지원 정보가 없습니다.",
+      "serve.nocmd": "이 엔진에서 지원이 확인되지 않아 실행 코드를 제공하지 않습니다.",
+      "serve.noserver": "diffusers·transformers는 HTTP 서버를 내장하지 않습니다 — 직접 감싸거나 위의 vLLM·TensorRT 탭 경로를 쓰세요.",
+      "serve.omninote": "vLLM 코어가 아니라 확장판 vLLM-Omni가 서빙합니다 — 설치가 별도입니다.",
+      "serve.trtbeta": "VisualGen은 2026-02 도입된 베타라 API와 지원 목록이 계속 바뀝니다.",
+      "serve.trtstatic": "엔진을 미리 빌드하므로 해상도와 배치 크기가 고정됩니다 — 바꾸려면 재빌드해야 합니다.",
+      "serve.pkgnote": "모델 전용 패키지를 씁니다 — 의존성 충돌을 피하려면 격리 venv를 권장합니다.",
+
       // --- image / video generation (diffusion) ---
       "lbl.category": "모델 종류",
       "cat.llm": "텍스트 LLM",
@@ -257,7 +329,7 @@
       "doc.title": "LLM Self-Hosting Calculator · VRAM · cost · vLLM/SGLang/TensorRT-LLM serving readiness (docker-compose · K8s manifests)",
       "doc.desc": "Will this LLM run on my GPU/Mac? Cheaper than an API? Served natively on vLLM, SGLang or TensorRT-LLM? VRAM fit · token speed · break-even + per-node placement + three-engine serving-support verdicts (by model, quantization, hardware) + ready-to-run docker-compose / Kubernetes manifests, instantly in the browser. No keys, no data leaves your browser.",
       "h1": "LLM Self-Hosting Calculator",
-      "sub": "Will this model run on my hardware? Cheaper than an API? — instantly compute VRAM fit · speed · break-even for <b>text LLMs, image generation and video generation</b>. <b>No keys · no server · no data leaves your browser.</b>",
+      "sub": "Will this model run on my hardware? Cheaper than an API? — instantly compute VRAM fit · speed · break-even for <b>text LLMs, image generation, video generation and speech</b>. <b>No keys · no server · no data leaves your browser.</b>",
       "ctrl.lang": "Language",
       "ctrl.theme": "Theme",
       "theme.dark": "Dark",
@@ -296,6 +368,78 @@
       "legend.kv": "KV cache",
       "legend.overhead": "Overhead",
       "legend.vramcap": "Device VRAM limit",
+      // --- speech (STT/TTS) + placement + serving tabs ---
+      "cat.speech": "Speech STT/TTS",
+      "lbl.maudio": "Monthly audio volume",
+      "lbl.api.min": "Comparison API price ($/audio minute)",
+      "tab.mplace": "Per-node placement",
+      "tab.mpytorch": "PyTorch serving",
+      "tab.mvllm": "vLLM readiness",
+      "tab.mtrt": "TensorRT serving",
+      "speech.chip.stt": "speech recognition",
+      "speech.chip.tts": "speech synthesis",
+      "speech.realtime": "realtime",
+      "speech.perminute": "processes 1 minute of audio in {s}s",
+      "speech.belowrealtime": "⚠️ slower than realtime — not viable for streaming",
+      "speech.audiohours": "audio-hours/hour",
+      "speech.audiohour": "audio-hour",
+      "speech.batchnote": "Raising concurrency raises this — unlike diffusion, speech genuinely batches.",
+      "speech.capped": "Measured only up to concurrency {c}. Beyond that we hold the last measured value rather than extrapolate.",
+      "speech.nospeed": "No benchmark of our own for this model, so we do not estimate speed. The VRAM fit still holds.",
+      "speech.noruntime": "⛔ No runtime currently exists for this model",
+      "speech.vram.line": "Weights <b>{w}GB</b> + runtime overhead <b>{o}GB</b> = <b>{tot}GB</b>",
+      "speech.vram.measured": "This is measured resident memory, not arithmetic.",
+      "speech.maudiolab": "{n} audio-hours/mo",
+      "speech.cost.self": "Self-hosted cost",
+      "speech.cost.permin": "per audio minute",
+      "speech.cost.noapi": "Enter an API price to compare.",
+      "speech.cost.cheaper": "✅ Self-hosting is ${v} cheaper per audio-hour",
+      "speech.cost.apicheaper": "⚠️ The API is ${v} cheaper per audio-hour",
+      "speech.own.oversub": "⚠️ This fleet tops out at {max} audio-hours per month.",
+      "speech.method.anchor": "Anchor: {src} run on {gpu} via {engine} at {x}x realtime (concurrency {c}).",
+      "speech.method.batched": "At concurrency {c} it reached {x}x realtime.",
+      "speech.method.wer": "WER from the same run: {w}% (and {wb}% at higher concurrency).",
+      "speech.method.sibling": "This model was not benchmarked itself; the figure is scaled from an identical architecture by parameter ratio.",
+      "speech.method.scaled": "Scaled by {gpu}'s compute ratio.",
+      "speech.method.none": "No benchmark of our own, so speed is not estimated — VRAM only for this model.",
+      "mplace.gpus": "GPU count",
+      "mplace.instance": "instance",
+      "mplace.rep": "replicas",
+      "mplace.replicas": "{r} replicas",
+      "mplace.short": "needs {n} GPUs for a single instance",
+      "mplace.summary": "<b>{n}</b> GPUs · <b>{per}</b> per instance → <b>{r}</b> replicas",
+      "mplace.idle": "⚠️ {i} GPUs sit idle — the fleet does not divide evenly by GPUs-per-instance.",
+      "mplace.shortnote": "⚠️ This model needs {n} GPUs for one instance — the current selection cannot host even one.",
+      "mplace.throughput": "Aggregate throughput <b>{v}</b> {unit}",
+      "mplace.nothroughput": "No latency available, so no aggregate throughput.",
+      "mplace.ladder": "Throughput by GPU count",
+      "mplace.whytitle": "Why replicas, not sharding",
+      "mplace.why.media1": "The LLM tab solves how to <b>split</b> one model across devices. A diffusion model usually fits on one, so the question inverts — how many <b>replicas</b> do you run.",
+      "mplace.why.media2": "Measured, raising the batch buys 6-10% for 1.5x the VRAM. A second GPU buys a clean 2x. For diffusion the answer is replicas, not batching.",
+      "mplace.why.speech1": "Speech models are a few GB, so they almost always fit on one device. You scale them by replication, not sharding.",
+      "mplace.why.speech2": "Unlike diffusion, though, concurrency <b>inside</b> an instance also pays (measured: Granite 37.9x to 124x). Raise concurrency before you add replicas — it is cheaper.",
+      "rd.tier.native": "native support",
+      "rd.tier.partial": "partial — needs checking",
+      "rd.tier.custom": "vendor's own path",
+      "rd.tier.transformers": "Transformers backend",
+      "rd.tier.unsupported": "unsupported",
+      "rd.tier.unknown": "unverified",
+      "rd.tier.incompatible": "hardware unsupported",
+      "serve.cmd": "Serving code",
+      "serve.via": "Path",
+      "serve.lib": "Library",
+      "serve.pipeline": "Pipeline class",
+      "serve.arch": "Architecture",
+      "serve.servedid": "Checkpoint served",
+      "serve.docs": "Read the support list",
+      "serve.nodata": "No support information for this model.",
+      "serve.nocmd": "Support is not confirmed on this engine, so no command is offered.",
+      "serve.noserver": "diffusers and transformers ship no HTTP server — wrap it yourself, or use the vLLM/TensorRT paths above.",
+      "serve.omninote": "Served by the vLLM-Omni extension, not vLLM core — it installs separately.",
+      "serve.trtbeta": "VisualGen is a beta introduced 2026-02; its API and model list are still changing.",
+      "serve.trtstatic": "The engine is pre-built, so resolution and batch size are baked in — changing them means a rebuild.",
+      "serve.pkgnote": "This uses a model-specific package — an isolated venv is recommended to avoid dependency conflicts.",
+
       // --- image / video generation (diffusion) ---
       "lbl.category": "Model type",
       "cat.llm": "Text LLM",
@@ -491,6 +635,145 @@
 
   // Korean-source -> English for strings that live in the data files (translated at render).
   const DATA = {
+    // --- data/speech-models.json + data/serving-support.json ---
+    "TensorRT 저장소의 demo/Diffusion 경로(TensorRT-LLM이 아님) — SDXL·SDXL Turbo가 명시적으로 등재돼 있습니다.":
+      "The demo/Diffusion path in the TensorRT repo (not TensorRT-LLM) — SDXL and SDXL Turbo are listed explicitly.",
+    "엔진을 미리 빌드하는 방식이라 해상도와 배치 크기가 엔진에 고정됩니다(--build-static-batch). 설정을 바꾸면 몇 분짜리 재빌드가 필요합니다.":
+      "Engines are pre-built, so resolution and batch size are baked into the engine (--build-static-batch). Changing either means a multi-minute rebuild.",
+    "model_index.json의 _diffusers_version이 0.37.0.dev0으로 찍혀 있지만 이건 저장 당시 버전이지 최소 요구가 아닙니다 — 실측에서 diffusers 0.39 정식 릴리스로 로드됐습니다. .dev 표기만 보고 git main을 설치하다 기존 diffusers를 깨뜨린 사고가 있었으니 판정은 hasattr(diffusers,'Flux2KleinPipeline')로 하세요.":
+      "model_index.json records _diffusers_version 0.37.0.dev0, but that is the version it was SAVED with, not a minimum requirement — measured, it loads on the diffusers 0.39 stable release. Installing git main because of a .dev tag once broke an existing diffusers install here, so test with hasattr(diffusers,'Flux2KleinPipeline') instead.",
+    "prompt를 반드시 키워드 인자로 넘겨야 합니다 — 첫 위치 인자가 prompt가 아니라서 포지셔널로 주면 전부 'Provide either prompt or prompt_embeds'로 죽습니다.":
+      "Pass prompt as a keyword argument — its first positional parameter is not prompt, so positional calls all die with 'Provide either prompt or prompt_embeds'.",
+    "TensorRT-LLM VisualGen이 FLUX.2 계열을 다루지만 지원 체크포인트 표에 FLUX.2-dev만 있고 klein-4B(증류 소형판)는 이름이 없습니다 — 실측 확인 필요.":
+      "TensorRT-LLM VisualGen covers the FLUX.2 family, but its supported-checkpoint table names only FLUX.2-dev; the distilled klein-4B is absent — needs verifying.",
+    "TensorRT 저장소의 demo/Diffusion은 FLUX.1 계열만 지원해 FLUX.2는 대상이 아닙니다.":
+      "The TensorRT repo's demo/Diffusion covers only the FLUX.1 family, so FLUX.2 is out of scope there.",
+    "_diffusers_version이 0.36.0.dev0이지만 0.39 정식 릴리스에서 동작합니다(실측).":
+      "_diffusers_version says 0.36.0.dev0, but it runs on the 0.39 stable release (measured).",
+    "TensorRT-LLM VisualGen 표에도, TensorRT demo/Diffusion 목록에도 없습니다.":
+      "Absent from both the TensorRT-LLM VisualGen table and the TensorRT demo/Diffusion list.",
+    "TensorRT-LLM VisualGen 지원 체크포인트 표에 정확한 이름으로 등재돼 있고 trtllm-serve의 /v1/images/generations로 서빙됩니다.":
+      "Listed by exact name in the TensorRT-LLM VisualGen supported-checkpoint table and served through trtllm-serve's /v1/images/generations.",
+    "VisualGen은 2026-02 도입된 베타라 API와 지원 목록이 계속 바뀐다고 문서에 명시돼 있습니다.":
+      "VisualGen is a beta introduced in 2026-02; the docs state its API and supported list are still changing.",
+    "vLLM-Omni 표에는 Qwen/Qwen-Image-Edit로 등재돼 있고 우리가 쓰는 2511 리비전은 이름이 다릅니다 — 같은 계열이라 동작할 가능성이 높지만 확인이 필요합니다.":
+      "The vLLM-Omni table lists Qwen/Qwen-Image-Edit, whereas we run the 2511 revision under a different name — same family, so it will most likely work, but it needs confirming.",
+    "MoE라 transformer(high-noise)와 transformer_2(low-noise)를 모두 로드하고 boundary_ratio로 전환합니다 — diffusers 0.35 이상이 필요합니다.":
+      "Being MoE, it loads both transformer (high-noise) and transformer_2 (low-noise) and switches on boundary_ratio — diffusers 0.35 or newer is required.",
+    "TensorRT-LLM VisualGen 표에 Diffusers 리비전 이름으로 등재돼 있습니다.":
+      "Listed in the TensorRT-LLM VisualGen table under its Diffusers revision name.",
+    "TensorRT demo/Diffusion에도 Wan 2.2가 있지만 이쪽은 엔진 빌드 방식이고 T2V·I2V 구분이 문서에 드러나지 않습니다.":
+      "TensorRT demo/Diffusion also carries Wan 2.2, but that is the engine-build path and the docs do not separate T2V from I2V.",
+    "TensorRT demo/Diffusion 목록은 Wan 2.2를 통칭할 뿐 I2V 변형을 따로 명시하지 않아 그 경로는 미확인입니다.":
+      "The TensorRT demo/Diffusion list names Wan 2.2 generically without calling out the I2V variant, so that path is unverified.",
+    "모델 카드가 diffusers 지원을 'coming soon'으로 적어두고 있어 현재 정본 경로는 Lightricks/LTX-2 저장소의 CLI입니다. ThakiCloud 실측도 이 경로로 돌렸습니다.":
+      "The model card marks diffusers support as 'coming soon', so the canonical path today is the CLI in the Lightricks/LTX-2 repo. ThakiCloud's own measurement used that path.",
+    "텍스트 인코더로 gemma-3-12b-it를 따로 받아야 합니다 — 체크포인트에 포함돼 있지 않습니다.":
+      "You must download gemma-3-12b-it separately as the text encoder — it is not bundled in the checkpoint.",
+    "vLLM-Omni는 diffusers 포맷으로 변환된 diffusers/LTX-2.3-Diffusers를 등재하고 있습니다. 우리가 스테이징한 것은 Lightricks/LTX-2.3의 단일 파일 체크포인트라 저장 포맷이 다릅니다 — 변환본을 받아야 합니다.":
+      "vLLM-Omni lists diffusers/LTX-2.3-Diffusers, a format-converted repo. What we staged is the single-file checkpoint from Lightricks/LTX-2.3, which is a different layout — you need the converted build.",
+    "VisualGen 표에 'Lightricks/LTX-2'가 통칭으로 올라 있고 Gemma3 텍스트 인코더와 BF16/FP8/FP4를 명시하지만, 2.3 포인트 릴리스는 이름이 없어 버전 동등성은 미확인입니다.":
+      "The VisualGen table carries 'Lightricks/LTX-2' generically and specifies a Gemma3 text encoder with BF16/FP8/FP4, but the 2.3 point release is not named, so version parity is unverified.",
+    "model_index.json 기준 파이프라인은 MiniMaxH3ModularPipeline이고 transformer_ref(참조 조건화용 두 번째 DiT)까지 포함합니다 — 두 트랜스포머를 모두 올리면 상주 메모리가 더 늘어납니다.":
+      "Per model_index.json the pipeline is MiniMaxH3ModularPipeline and it includes transformer_ref, a second DiT for reference conditioning — loading both transformers raises resident memory further.",
+    "vLLM-Omni 표에서 NVIDIA 백엔드만 지원으로 표시돼 있습니다(AMD·Ascend·Intel 미표기).":
+      "The vLLM-Omni table marks only the NVIDIA backend as supported (AMD, Ascend and Intel are not listed).",
+    "TensorRT-LLM VisualGen과 TensorRT demo/Diffusion 어디에도 없습니다. 벤더 문서는 SGLang·vLLM-Omni·ComfyUI를 권장합니다.":
+      "Absent from both TensorRT-LLM VisualGen and TensorRT demo/Diffusion. The vendor's own docs point to SGLang, vLLM-Omni and ComfyUI.",
+    "vLLM 코어의 /v1/audio/transcriptions로 서빙됩니다 — ThakiCloud가 이 경로로 실측했고 동시성 8에서 실시간 124배가 나왔습니다.":
+      "Served through vLLM core's /v1/audio/transcriptions — this is the path ThakiCloud measured, reaching 124x realtime at concurrency 8.",
+    "TensorRT-LLM에도 TensorRT-Edge-LLM에도 등재돼 있지 않습니다.":
+      "Listed in neither TensorRT-LLM nor TensorRT-Edge-LLM.",
+    "순수 transformers로는 오디오 함수처럼 못 씁니다 — 프로세서가 text 인자를 필수로 요구하는 멀티모달 챗 인터페이스입니다.":
+      "You cannot call it like an audio function from plain transformers — the processor requires a text argument, making it a multimodal chat interface.",
+    "반드시 -hf 빌드 + transformers 5.14 이상이어야 합니다. 이미지 기본값 5.12.1은 model type qwen3_asr를 모릅니다(에러 메시지가 체크포인트 탓처럼 나와 원인을 헷갈리게 합니다).":
+      "It requires the -hf build plus transformers 5.14 or newer. The image default of 5.12.1 does not know model type qwen3_asr (and the error blames the checkpoint, which misdirects the diagnosis).",
+    "vLLM 코어 레지스트리에 등재된 ASR이고 ThakiCloud 실측 경로입니다(1.7B 기준 동시성 8에서 실시간 68.7배).":
+      "Registered as an ASR in the vLLM core registry and the path ThakiCloud measured (68.7x realtime at concurrency 8 for the 1.7B).",
+    "메인라인 TensorRT-LLM이 아니라 별도 저장소인 NVIDIA/TensorRT-Edge-LLM(Jetson·DRIVE 대상)에 Qwen3-ASR 1.7B가 등재돼 있습니다 — 코드베이스가 다르므로 데이터센터 GPU 서빙 근거로 쓸 수 없습니다.":
+      "Not mainline TensorRT-LLM: Qwen3-ASR 1.7B appears in the separate NVIDIA/TensorRT-Edge-LLM repo (Jetson/DRIVE). That is a different codebase and cannot be cited as data-centre GPU support.",
+    "메인라인 TensorRT-LLM이 아니라 별도 저장소인 NVIDIA/TensorRT-Edge-LLM(Jetson·DRIVE 대상)에 Qwen3-ASR 0.6B가 등재돼 있습니다 — 코드베이스가 다르므로 데이터센터 GPU 서빙 근거로 쓸 수 없습니다.":
+      "Not mainline TensorRT-LLM: Qwen3-ASR 0.6B appears in the separate NVIDIA/TensorRT-Edge-LLM repo (Jetson/DRIVE). That is a different codebase and cannot be cited as data-centre GPU support.",
+    "trust_remote_code=True가 필요한 custom_code 모델입니다.":
+      "A custom_code model requiring trust_remote_code=True.",
+    "TensorRT-LLM에 전용 예제가 있습니다(convert_checkpoint.py → trtllm-build → run.py). 이 목록에서 세 엔진 모두에서 도는 유일한 음성 모델입니다.":
+      "TensorRT-LLM ships a dedicated example (convert_checkpoint.py to trtllm-build to run.py). It is the only speech model here that runs on all three engines.",
+    "transformers가 아니라 NeMo 생태계이고 격리 venv가 필요합니다.":
+      "This is the NeMo ecosystem rather than transformers, and it needs an isolated venv.",
+    "언어 프롬프트는 set_inference_prompt(PromptStreamingMixin)로만 전달됩니다 — 오프라인 transcribe()는 그 값을 읽지 않아 배치 전사로는 쓸 수 없습니다.":
+      "The language prompt only reaches the model through set_inference_prompt (PromptStreamingMixin) — offline transcribe() never reads it, so batch transcription is not usable.",
+    "RNN-T 아키텍처라 vLLM이 서빙하지 못합니다(inputs_embeds 계약 불일치).":
+      "vLLM cannot serve it: the RNN-T architecture does not match the inputs_embeds contract.",
+    "TensorRT-LLM이 최적화할 수 있다는 일반적 마케팅 문구는 있으나 구체적 예제나 체크포인트 변환 경로를 찾지 못했습니다. NVIDIA 자체 안내는 NeMo + Triton을 가리킵니다.":
+      "There is generic marketing copy saying TensorRT-LLM can optimise it, but no concrete example or checkpoint-conversion path was found. NVIDIA's own guidance points to NeMo plus Triton.",
+    "전용 패키지 voxcpm으로 스톡 이미지에서 그대로 돕니다 — 이 목록에서 격리 venv가 필요 없는 유일한 TTS입니다.":
+      "Runs as-is on the stock image through its own voxcpm package — the only TTS here that needs no isolated venv.",
+    "torch.compile로 1.27배 빨라집니다(실측).":
+      "torch.compile makes it 1.27x faster (measured).",
+    "vLLM-Omni가 등재한 것은 VoxCPM2이고 우리가 쓰는 것은 VoxCPM1.5입니다 — 세대가 달라 그대로 적용된다고 볼 수 없습니다.":
+      "What vLLM-Omni lists is VoxCPM2, while we run VoxCPM1.5 — a different generation, so support does not carry over unchanged.",
+    "의존성이 torch 2.6을 핀하고 transformers 5.x에서 LlamaModel import가 깨져 격리 venv가 필수입니다. numpy·pkuseg 휠도 계단식으로 막혀 constraints 파일로 재해결을 막아야 합니다.":
+      "Its dependencies pin torch 2.6 and its LlamaModel import breaks on transformers 5.x, so an isolated venv is mandatory. numpy and pkuseg wheels then block in cascade, so pin a constraints file to stop re-resolution.",
+    "실측 RTF 1.277로 실시간에 못 미칩니다.":
+      "Measured RTF 1.277 — slower than realtime.",
+    "vLLM 코어에도 vLLM-Omni 지원 목록에도 없습니다.":
+      "Present in neither vLLM core nor the vLLM-Omni supported list.",
+    "82M이라 CPU에서도 실용적입니다.":
+      "At 82M it is practical even on CPU.",
+    "vLLM-Omni 지원 목록에 없습니다.":
+      "Not in the vLLM-Omni supported list.",
+    "현재 스택에서 합성이 되지 않습니다 — torch 2.3 시절 코드가 torch 2.11 오디오 API에서 torchcodec 예외로 깨집니다(9라운드 확인).":
+      "Synthesis does not work on the current stack — torch 2.3-era code breaks against the torch 2.11 audio API with a torchcodec exception (confirmed over nine rounds).",
+    "funasr가 아니라 cosyvoice 패키지이고, 벤더 저장소를 tarball로 받아야 합니다(잡 이미지에 git이 없음).":
+      "The package is cosyvoice, not funasr, and the vendor repo has to be fetched as a tarball (the job image has no git).",
+    "⭐ 로컬 패키지 경로는 막혀 있지만 vLLM-Omni가 정확히 이 체크포인트를 등재하고 있습니다 — 우리 백로그의 'CosyVoice3 실행 불가'를 우회할 후보 경로입니다(미검증).":
+      "The local package path is blocked, but vLLM-Omni lists exactly this checkpoint — a candidate route around our 'CosyVoice3 cannot run' backlog item (unverified).",
+    "CosyVoice의 TensorRT-LLM 런타임 지원을 주장하는 2차 출처가 있으나 공식 문서·예제에서 확인되지 않습니다.":
+      "A secondary source claims TensorRT-LLM runtime support for CosyVoice, but it is not confirmed in official docs or examples.",
+    "transformers에 qwen3_tts 모델 타입이 없고 공개된 전용 패키지도 없어 로드 경로가 없습니다.":
+      "transformers has no qwen3_tts model type and no dedicated package has been published, so there is no load path.",
+    "⭐ vLLM-Omni가 Qwen3-TTS 변형들(Base·CustomVoice·VoiceDesign)을 등재하고 있어 현재 알려진 유일한 서빙 경로입니다(미검증).":
+      "vLLM-Omni lists the Qwen3-TTS variants (Base, CustomVoice, VoiceDesign), making it the only known serving path today (unverified).",
+    "메인라인이 아닌 NVIDIA/TensorRT-Edge-LLM에 Qwen3-TTS-12Hz-0.6B/1.7B-CustomVoice가 등재돼 있습니다 — 엣지 대상의 별도 코드베이스입니다.":
+      "Qwen3-TTS-12Hz-0.6B/1.7B-CustomVoice appears in NVIDIA/TensorRT-Edge-LLM rather than mainline — a separate, edge-targeted codebase.",
+    "diffusers와 transformers 모두 HTTP 서버를 내장하지 않습니다 — 직접 FastAPI 등으로 감싸거나 아래 엔진을 쓰세요.":
+      "Neither diffusers nor transformers bundles an HTTP server — wrap it yourself, or use one of the engines below.",
+    "VisualGen은 2026-02 도입된 베타로 API와 지원 목록이 계속 바뀝니다. demo/Diffusion은 엔진을 미리 빌드해 해상도·배치가 고정됩니다.":
+      "VisualGen is a beta introduced in 2026-02 and its API and supported list keep changing. demo/Diffusion pre-builds engines, so resolution and batch are fixed.",
+    "TensorRT-Edge-LLM (별도 저장소)":
+      "TensorRT-Edge-LLM (separate repo)",
+    "TensorRT-LLM whisper 예제":
+      "TensorRT-LLM whisper example",
+    "실측한 STT 중 정확도와 속도 모두 1위입니다(WER 0.82%, 동시성 8에서 0.37%). 이름은 1B이지만 음성 인코더까지 합쳐 실제 2.32B이고 bf16 상주 약 5GB라 어떤 최신 GPU에도 여유롭게 들어갑니다. vLLM이 네이티브로 서빙하고, 동시성을 1에서 8로 올리면 실시간 대비 37.9배에서 124배로 뜁니다 — 디퓨전과 달리 음성은 배칭이 실제로 듣습니다.":
+      "Fastest AND most accurate of the STT models we benchmarked (WER 0.82%, and 0.37% at concurrency 8). Despite the 1B in its name it is really 2.32B once the speech encoder is counted, and about 5GB resident at bf16 — comfortable on any current GPU. vLLM serves it natively, and raising concurrency from 1 to 8 takes it from 37.9x to 124x realtime: unlike diffusion, speech genuinely benefits from batching.",
+    "52개 언어를 지원하는 다국어 STT로, 한국어를 포함한 비영어 작업의 기본 선택지입니다. 영어 LibriSpeech에서는 Granite보다 느리고(17.7배 대 37.9배) WER도 높지만(1.24% 대 0.82%) 언어 커버리지가 훨씬 넓습니다. ⚠️ 순수 transformers로는 굴러가지 않습니다 — 프로세서가 text 인자를 필수로 요구하는 멀티모달 챗 인터페이스라 오디오 함수처럼 호출할 수 없고, 반드시 `-hf` 빌드 + transformers 5.14 이상이 필요합니다. 실서빙 경로는 vLLM입니다.":
+      "A multilingual STT covering 52 languages, making it the default choice for non-English work including Korean. On English LibriSpeech it is slower than Granite (17.7x vs 37.9x) with a higher WER (1.24% vs 0.82%), but its language coverage is far wider. ⚠️ It does not run under plain transformers — the processor requires a text argument, so it is a multimodal chat interface rather than an audio function, and it needs the -hf build with transformers 5.14+. The real serving path is vLLM.",
+    "1.7B와 같은 아키텍처의 소형 버전으로 bf16 상주 약 2GB입니다. 엣지나 다중 인스턴스 배치에 적합합니다. 자체 측정은 1.7B만 했으므로 속도는 같은 계열에서 파라미터 비율로 환산한 값이고, 정확도는 상위 모델보다 낮을 것으로 보아야 합니다(미측정).":
+      "The small sibling of the 1.7B on the same architecture, about 2GB resident at bf16. Suited to edge deployment or packing many instances per device. We only benchmarked the 1.7B, so the speed here is scaled from that within the family by parameter ratio, and accuracy should be assumed lower than the larger model (unmeasured).",
+    "vLLM 레지스트리에 등재된 ASR이라 서빙 경로는 열려 있습니다. ⚠️ gated 저장소라 인제스트 시 19개 파일 중 18개가 403으로 실패했는데도 워커는 성공으로 끝났고, 빈 prefix를 가리키는 카탈로그 행이 만들어진 적이 있습니다 — 라이선스 동의는 토큰을 소유한 계정에 붙으므로 실제 파일에 HEAD를 던져 확인해야 합니다. 자체 속도·정확도 측정치는 없습니다.":
+      "An ASR registered in the vLLM registry, so the serving path is open. ⚠️ It is a gated repo: during ingest 18 of 19 files failed with 403 while the worker still reported success, producing a catalog row pointing at an empty prefix. Licence acceptance binds to the account holding the token, so verify by sending a HEAD to an actual weight file. We have no speed or accuracy measurement of our own.",
+    "100개 이상 언어를 다루는 인코더-디코더 STT의 사실상 정확도 기준선입니다. 이 목록에서 가장 오래됐지만 여전히 가장 널리 배포돼 있고, vLLM·TensorRT-LLM·transformers 어디서나 도는 유일한 모델이라 서빙 경로 선택지가 가장 넓습니다. ThakiCloud 레지스트리에는 스테이징돼 있지 않아 자체 측정치가 없습니다.":
+      "The de-facto accuracy baseline for encoder-decoder STT across 100+ languages. It is the oldest model here yet still the most widely deployed, and the only one that runs on transformers, vLLM and TensorRT-LLM alike — so it has the widest choice of serving paths. It is not staged in the ThakiCloud registry, so we have no measurement of our own.",
+    "large-v3에서 디코더 층을 32개에서 4개로 줄여 훨씬 빠르면서 정확도 손실은 작은 버전입니다. 실시간 전사에서 가장 흔한 기본값이며 bf16 상주 2GB 미만이라 소형 카드에도 들어갑니다. 자체 측정치는 없습니다.":
+      "large-v3 with the decoder cut from 32 layers to 4 — much faster for a small accuracy cost. It is the most common default for realtime transcription and sits under 2GB resident at bf16, so it fits small cards. No measurement of our own.",
+    "RNN-T 스트리밍 ASR입니다. 디스크 5.66GB가 큰 이유는 fp32로 배포되기 때문이고, 실제 파라미터는 1.42B입니다. ⚠️ 라이선스가 HF 메타데이터에는 other로 표기돼 있어 상업 이용 전 원문 확인이 필요합니다.":
+      "An RNN-T streaming ASR. The 5.66GB on disk is large because it ships as fp32; the real parameter count is 1.42B. ⚠️ HF metadata records the licence as 'other', so confirm the original terms before commercial use.",
+    "스트리밍 전용 체크포인트라 배치 전사로는 측정할 수 없습니다. 언어 프롬프트가 set_inference_prompt(PromptStreamingMixin) 경로로만 전달되고 오프라인 transcribe()는 그 값을 아예 읽지 않아, 6라운드에 걸쳐 인자를 바꿔 넣어도 전부 무시됐습니다. vLLM은 RNN-T를 서빙하지 못하고 nemo_toolkit[asr] 격리 venv가 필요합니다. 실시간 스트리밍 하네스를 따로 짜야 사용할 수 있습니다.":
+      "A streaming-only checkpoint, so it cannot be measured by batch transcription. The language prompt reaches it only through set_inference_prompt (PromptStreamingMixin) and offline transcribe() never reads that value — six rounds of changing the argument were all silently ignored. vLLM cannot serve RNN-T, and nemo_toolkit[asr] needs an isolated venv. Using it requires writing a separate realtime streaming harness.",
+    "실측한 TTS 중 압도적으로 빠릅니다 — RTF 0.028, 즉 실시간의 36배로 합성합니다. 1분짜리 음성을 1.7초에 만듭니다. bf16 상주 2GB로 가볍고 스톡 이미지에서 그대로 돌아가는 유일한 TTS이기도 합니다. torch.compile로 1.27배 더 빨라집니다. ⚠️ 초판 측정에서 웜업을 빼지 않아 RTF를 4.49(실시간 0.2배)로 잘못 보고했다가 0.028로 정정한 이력이 있습니다 — 160배 오차였습니다.":
+      "By far the fastest TTS we measured — RTF 0.028, meaning it synthesises at 36x realtime and produces a minute of speech in 1.7 seconds. It is also light at 2GB resident and the only TTS here that runs on the stock image unmodified. torch.compile adds another 1.27x. ⚠️ Our first measurement failed to exclude warm-up and reported RTF 4.49 (0.2x realtime) before being corrected to 0.028 — a 160x error.",
+    "23개 이상 언어와 감정 제어, zero-shot 클로닝을 지원하지만 ⚠️ 실시간에 못 미칩니다(RTF 1.277 = 실시간의 0.78배). 1분 음성을 만드는 데 77초가 걸립니다. 이 목록에서 가장 작은 축인데 가장 느리다는 점이 중요합니다 — 작은 모델을 고르는 것과 실시간 합성을 얻는 것은 별개입니다. 의존성이 torch 2.6을 핀하고 transformers 5.x에서 LlamaModel import가 깨져 격리 venv가 필수입니다.":
+      "Supports 23+ languages with emotion control and zero-shot cloning, but ⚠️ it does not reach realtime (RTF 1.277 = 0.78x realtime), taking 77 seconds to produce a minute of speech. The important point is that the smallest model here is also the slowest — picking a small model and getting realtime synthesis are different things. Its dependencies pin torch 2.6 and its LlamaModel import breaks on transformers 5.x, so an isolated venv is mandatory.",
+    "82M짜리 초경량 TTS로 엣지·CPU 배포에서 가장 인기 있는 선택지입니다. 상주 메모리가 1GB 미만이라 GPU 없이도 실용적입니다. ThakiCloud 레지스트리에 스테이징돼 있지 않아 자체 측정치는 없고, 속도는 파라미터 기반 추정입니다.":
+      "An ultra-light 82M TTS and the most popular choice for edge and CPU deployment, under 1GB resident and practical without a GPU. It is not staged in the ThakiCloud registry, so we have no measurement and the speed is a parameter-based estimate.",
+    "다국어 zero-shot TTS입니다. 의존성이 torch 2.3.1과 numpy 1.26.4를 핀해서 그대로 설치하면 컨테이너의 torch 2.11(cu130)을 두 세대 되돌리고 CUDA를 잃습니다.":
+      "A multilingual zero-shot TTS. Its dependencies pin torch 2.3.1 and numpy 1.26.4, so installing them as declared rolls the container's torch 2.11 (cu130) back two generations and loses CUDA.",
+    "현재 스택에서 합성이 되지 않습니다(9라운드 확인). zero-shot 전용인데 list_available_spks()가 빈 배열이라 사전 화자 모드를 못 쓰고, 벤더 참조 클립과 벤더 헬퍼까지 그대로 써도 torchcodec에서 깨집니다(video_tensor must be kUInt8 — 코덱은 인코딩된 바이트를 원하는데 모델은 float 텐서를 넘김). 호출 규약 문제가 아니라 torch 2.3 시절 코드가 2.11 오디오 API에서 깨지는 세대 불일치이므로, 벤더 세대에 맞춘 별도 이미지가 필요합니다.":
+      "Synthesis does not work on the current stack (confirmed over nine rounds). It is zero-shot only, but list_available_spks() returns an empty array so the preset-speaker mode is unusable, and even with the vendor's own reference clip and helper it breaks inside torchcodec (video_tensor must be kUInt8 — the codec wants encoded bytes while the model passes a float tensor). This is not a calling-convention problem but a generation mismatch between torch 2.3-era code and the torch 2.11 audio API, so it needs a separate image pinned to the vendor's generation.",
+    "10개 언어와 3초 클로닝, 보이스 디자인을 내세운 TTS입니다. ⚠️ Base 체크포인트는 generate_custom_voice를 거부하고 generate_voice_clone(ref_audio, ref_text) 경로만 받으므로 참조 음성이 반드시 필요합니다. 파라미터 2.27B는 speech_tokenizer 0.68GB를 포함한 스테이징 가중치 기준입니다.":
+      "A TTS advertising 10 languages, 3-second cloning and voice design. ⚠️ The Base checkpoint refuses generate_custom_voice and accepts only generate_voice_clone(ref_audio, ref_text), so a reference recording is mandatory. The 2.27B figure covers the staged weights including the 0.68GB speech_tokenizer.",
+    "서빙 런타임이 없습니다. transformers에 qwen3_tts 모델 타입이 없고 vLLM도 오디오 출력 모델을 서빙하지 못합니다. 전용 패키지도 공개되지 않아 현재로서는 로드 경로 자체가 없습니다.":
+      "No serving runtime exists. transformers has no qwen3_tts model type, vLLM cannot serve audio-output models, and no dedicated package has been published — so there is currently no load path at all.",
     // --- data/media-models.json (image + video generation) ---
     "라이선스가 유럽연합·영국·대한민국·미국을 Excluded Territory로 지정하고, 해당 지역에서는 상업 이용뿐 아니라 사용·복제·수정·배포·전시 전부를 금지합니다(제V.4조). 별도 라이선스를 신청하면 승인받을 수 있습니다. ThakiCloud는 이 조항 때문에 스테이징했던 가중치를 삭제했습니다 — 아래 수치는 라이선스가 허용되는 지역에서의 도입 검토용입니다.":
       "The licence names the European Union, the United Kingdom, the Republic of Korea and the United States as Excluded Territories, and in those regions it forbids not just commercial use but use, reproduction, modification, distribution and display outright (Section V.4). A separate licence can be applied for and granted. ThakiCloud deleted its staged weights because of this clause — the figures below are for evaluating deployment where the licence permits it.",
