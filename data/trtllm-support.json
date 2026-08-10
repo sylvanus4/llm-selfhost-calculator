@@ -107,7 +107,8 @@
     "GraniteForCausalLM": {"tool_parser": "hermes", "reasoning_parser": null},
     "Gemma3ForCausalLM": {"tool_parser": null, "reasoning_parser": null, "note": {"ko": "Gemma — 네이티브 파서 없음, 커스텀 chat_template.", "en": "Gemma — no native parser, custom chat_template."}},
     "Gemma4ForCausalLM": {"tool_parser": null, "reasoning_parser": null, "note": {"ko": "Gemma 4 — 커스텀 chat_template 필요.", "en": "Gemma 4 — needs a custom chat_template."}},
-    "Gemma4ForConditionalGeneration": {"tool_parser": null, "reasoning_parser": null}
+    "Gemma4ForConditionalGeneration": {"tool_parser": null, "reasoning_parser": null},
+    "MiniMaxM2ForCausalLM": {"tool_parser": "minimax_m2", "reasoning_parser": "minimax_m2", "note": {"ko": "MiniMax M2 — --tool_call_parser minimax_m2 --reasoning_parser minimax_m2 (TRT-LLM tool_parser_factory.py에 등록됨).", "en": "MiniMax M2 — --tool_call_parser minimax_m2 --reasoning_parser minimax_m2 (registered in TRT-LLM's tool_parser_factory.py)."}}
   },
   "quant_methods": {
     "fp8": "FP8 (E4M3). Hopper/Blackwell 텐서코어. ModelOpt 사전 양자화 또는 --kv_cache_dtype fp8.",
