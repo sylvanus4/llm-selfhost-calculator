@@ -52,10 +52,18 @@ for (const k of ["image", "selfhost", "api"]) (speech[k] || []).forEach(x => {
   ["note", "unit", "params", "vram"].forEach(f => { if (x[f] && /[가-힣]/.test(x[f])) surface.add(x[f]); });
 });
 
+// Image/video generation models: notes and licence-block reasons render in the media panel.
+const mediaModels = JSON.parse(fs.readFileSync(path.join(root, "data/media-models.json"))).models;
+for (const m of mediaModels) {
+  if (m.note) surface.add(m.note);
+  if (m.blocked && m.blocked.reason) surface.add(m.blocked.reason);
+}
+
 // api-prices preset labels/notes render in a dropdown that is NOT re-rendered on toggle,
 // so they must be language-neutral (no Korean) rather than DATA-translated.
 const apiPrices = JSON.parse(fs.readFileSync(path.join(root, "data/api-prices.json")));
-const apiKo = (apiPrices.presets || []).filter(p => /[가-힣]/.test(JSON.stringify(p)));
+const apiKo = [...(apiPrices.presets || []), ...(apiPrices.media_presets || [])]
+  .filter(p => /[가-힣]/.test(JSON.stringify(p)));
 ok("no Korean in api-prices preset labels (dropdown isn't re-translated)", apiKo.length === 0);
 if (apiKo.length) apiKo.forEach(p => console.log("      - " + p.label));
 

@@ -8,7 +8,18 @@ const td = (s) => I18N.td(s);            // data-file string (ko source -> curre
 I18N.initTheme();                        // set <html data-theme> early to avoid a flash
 I18N.initLang();
 
-const state = { models: [], gpus: [], apiPresets: [], speech: null, vllm: null, sglang: null, trtllm: null };
+const state = { models: [], gpus: [], apiPresets: [], speech: null, vllm: null, sglang: null, trtllm: null,
+  media: [], mediaPresets: [], cat: "llm" };
+
+// Everything the diffusion path needs that the LLM path does not.
+// refGpuId is the device our own benchmarks ran on — media latency is scaled FROM it.
+const MEDIA_REF_GPU = "b200";
+const isMedia = () => state.cat !== "llm";
+const mediaList = () => state.media.filter(m => m.kind === state.cat);
+// Resolution presets are offered per model because the useful ladder differs: a 480p video model
+// and a 1328px image model do not share a sensible list.
+const IMAGE_RES = [[512, 512], [768, 768], [1024, 1024], [1328, 1328], [1664, 928], [2048, 2048]];
+const VIDEO_RES = [[832, 480], [1280, 720], [1536, 1024], [1920, 1080]];
 
 // vLLM tab state: fetched = {id, config} for an arbitrary HF model (null = use curated dropdown);
 // manifests/spec cached from last render; active = which manifest tab is shown.
@@ -18,7 +29,7 @@ const sglangState = { spec: null, manifests: null, active: "compose" };
 const trtState = { spec: null, manifests: null, active: "compose" };
 
 async function loadData() {
-  const [m, g, a, s, v, sg, trt] = await Promise.all([
+  const [m, g, a, s, v, sg, trt, md] = await Promise.all([
     fetch("data/models.json").then(r => r.json()),
     fetch("data/gpus.json").then(r => r.json()),
     fetch("data/api-prices.json").then(r => r.json()),
@@ -26,10 +37,13 @@ async function loadData() {
     fetch("data/vllm-support.json").then(r => r.json()),
     fetch("data/sglang-support.json").then(r => r.json()),
     fetch("data/trtllm-support.json").then(r => r.json()),
+    fetch("data/media-models.json").then(r => r.json()),
   ]);
   state.models = m.models;
   state.gpus = g.gpus;
   state.apiPresets = a.presets;
+  state.mediaPresets = a.media_presets || [];
+  state.media = md.models;
   state.speech = s;
   state.vllm = v;
   state.sglang = sg;
@@ -81,6 +95,7 @@ function ownChartSVG(series, pb) {
 }
 
 function render() {
+  if (isMedia()) return renderMedia();
   const model = state.models.find(m => m.id === el("model").value);
   const gpu = state.gpus.find(g => g.id === el("gpu").value);
   const quant = el("quant").value;
@@ -162,7 +177,9 @@ function render() {
 
   const moeNote = model.moe ? tr("dyn.moenote", { t: fmt(model.total_params_b, 0), a: fmt(model.active_params_b, 1) }) : "";
   const kvNote = model.note ? ` · <span class="warn">${esc(td(model.note))}</span>` : "";
-  el("modelNote").innerHTML = `<a href="https://huggingface.co/${model.hf}" target="_blank" rel="noopener">${model.hf}</a>${moeNote}${kvNote}`;
+  el("modelNote").innerHTML =
+    `<div class="reflinks"><a class="reflink" href="https://huggingface.co/${esc(model.hf)}" target="_blank" rel="noopener">🤗 ${esc(model.hf)}</a></div>` +
+    `<div>${`${moeNote}${kvNote}`.replace(/^\s*·\s*/, "")}</div>`;
   if (context > model.context) el("modelNote").innerHTML += ` <span class="warn">${tr("dyn.ctxover", { m: model.context.toLocaleString() })}</span>`;
 
   renderVllm(r);
@@ -170,6 +187,207 @@ function render() {
   renderTrt(r);
   renderSpark(model, gpu, context);
   renderReference();   // re-render on every pass so language toggle re-translates the speech/image tables (fixes EN-mode Korean leak)
+}
+
+// ---- Image / video generation tab -----------------------------------------
+
+// How much to trust the latency number, and why. This is deliberately visible in the UI:
+// a diffusion latency scaled from our own benchmark and one extrapolated from a roofline are
+// not the same claim, and collapsing them into one bold number would be dishonest.
+const SPEED_BADGE = { measured: "ok", "measured-sibling": "ok", "measured-approx": "multi",
+  estimated: "warn", unmodelled: "no", unknown: "no" };
+
+// Weights + licence, both one click away. People evaluating a model want to open the repo and
+// read the actual terms, not take a calculator's word for either.
+function mediaLinks(model) {
+  const hf = `<a class="reflink" href="https://huggingface.co/${esc(model.hf)}" target="_blank" rel="noopener">🤗 ${esc(model.hf)}</a>`;
+  const lic = model.license_url
+    ? `<a class="reflink" href="${esc(model.license_url)}" target="_blank" rel="noopener">📄 ${esc(model.license)}</a>`
+    : `<span class="reflink dim">📄 ${esc(model.license)}</span>`;
+  return `<div class="reflinks">${hf}${lic}</div>`;
+}
+
+function mediaOwnInput() {
+  const raw = el("capex").value.trim();
+  return {
+    pricePerKwh: parseFloat(el("kwh").value),
+    monthlyItems: parseInt(el("monthlyItems").value, 10),
+    capexOverride: raw === "" ? null : parseFloat(raw),
+  };
+}
+
+function renderMedia() {
+  const model = mediaList().find(m => m.id === el("model").value) || mediaList()[0];
+  if (!model) return;
+  const gpu = state.gpus.find(g => g.id === el("gpu").value);
+  const refGpu = state.gpus.find(g => g.id === MEDIA_REF_GPU);
+  const quant = el("quant").value;
+  const mode = document.querySelector('input[name="costmode"]:checked').value;
+  const isVideo = model.kind === "video";
+  const unit = isVideo ? tr("media.unit.clip") : tr("media.unit.image");
+
+  el("rentGroup").hidden = mode === "own";
+  el("ownInputs").hidden = mode !== "own";
+
+  // Chips + note are shared with the LLM path, so they get rebuilt here for media shape.
+  const chip = (t) => `<span class="chip">${t}</span>`;
+  const total = model.backbone_params_b + (model.text_encoder_params_b || 0);
+  el("modelChips").innerHTML =
+    chip(model.moe
+      ? `${fmt(model.backbone_params_b, 1)}B ${tr("media.chip.total")} · A${fmt(model.backbone_active_params_b, 1)}B ${tr("media.chip.active")}`
+      : `${fmt(model.backbone_params_b, 1)}B ${tr("media.chip.backbone")}`) +
+    (model.text_encoder_params_b ? chip(`+${fmt(model.text_encoder_params_b, 1)}B ${tr("media.chip.textenc")}`) : "") +
+    chip(tr(isVideo ? "media.chip.video" : "media.chip.image") + (model.task ? ` · ${model.task}` : "")) +
+    chip(model.license) +
+    (model.released ? chip(`released ${model.released}`) : "") +
+    (model.catalog ? chip(tr("media.chip.catalog")) : "");
+  el("modelNote").innerHTML = mediaLinks(model) +
+    (model.note ? `<div class="warn" style="margin-top:4px">${esc(td(model.note))}</div>` : "");
+
+  // A territory restriction is shown, not enforced by refusing to compute: the numbers are what
+  // someone needs in order to decide whether to pursue a licence, or to plan where it could run.
+  // The licence text itself is one click away so the user can read the clause, not just our summary.
+  if (model.restriction) {
+    el("mediaBlocked").hidden = false;
+    el("mediaBlocked").className = "warn-box";
+    el("mediaBlocked").innerHTML =
+      `<b>${tr("media.restrict.title", { t: model.restriction.territories.join(" · ") })}</b>` +
+      `<div style="margin-top:4px">${esc(td(model.restriction.summary))}</div>` +
+      (model.license_url
+        ? `<div style="margin-top:6px"><a href="${esc(model.license_url)}" target="_blank" rel="noopener">${tr("media.restrict.readlicense", { name: esc(model.license) })}</a></div>`
+        : "");
+  } else {
+    el("mediaBlocked").hidden = true;
+  }
+  el("mediaBody").hidden = false;
+
+  const steps = parseInt(el("steps").value, 10);
+  const [w, h] = el("resolution").value.split("x").map(Number);
+  const frames = isVideo ? parseInt(el("frames").value, 10) : 1;
+  const rentRaw = el("rent").value.trim();
+  const apiRaw = el("api").value.trim();
+
+  const r = LLMCalc.computeMedia(model, gpu, quant, {
+    steps, width: w, height: h, frames, batch: 1, cfg: el("cfg").checked,
+    rentOverride: rentRaw === "" ? null : parseFloat(rentRaw),
+    apiPerItem: apiRaw === "" ? null : parseFloat(apiRaw),
+    refGpu, siblings: state.media,
+    own: mode === "own" ? mediaOwnInput() : null,
+  });
+  const N = r.gpusNeeded;
+
+  el("stepsLabel").textContent = `${steps} steps`;
+  el("mitemLabel").textContent = tr("media.mitemlab", { n: Number(el("monthlyItems").value).toLocaleString(), unit });
+  el("mitemLabelText").textContent = tr(isVideo ? "lbl.mitem.clip" : "lbl.mitem.image");
+  if (isVideo) el("framesLabel").textContent = tr("media.frameslab",
+    { n: frames, s: fmt(frames / (model.fps || 24), 1), fps: model.fps || 24 });
+
+  const gpuShortName = esc(gpu.name.split(" (")[0]);
+  el("mediaFitBadge").innerHTML = r.fits
+    ? `<span class="badge ok">${tr("dyn.fit.single", { gpu: gpuShortName })}</span>`
+    : `<span class="badge multi">${tr("dyn.fit.multi", { gpu: gpuShortName, n: N })}</span>`;
+
+  // VRAM bar: backbone / text encoder / VAE+activations. The text encoder is broken out on
+  // purpose — it is routinely a third of resident memory and routinely forgotten.
+  const t = r.vramTotal;
+  const seg = (v, cls) => `<span class="seg ${cls}" style="width:${(v / t) * 100}%"></span>`;
+  let ticks = "";
+  for (let i = 1; i <= N && i * gpu.vram_gb < t; i++)
+    ticks += `<span class="cap" style="left:${(i * gpu.vram_gb / t) * 100}%"></span>`;
+  el("mediaVramBar").innerHTML =
+    seg(r.backboneGB, "w") + seg(r.encoderGB, "k") + seg(r.vaeGB + r.activationGB, "o") + ticks;
+  el("mediaVramNums").innerHTML =
+    tr("media.vram.line", { b: fmt(r.backboneGB), e: fmt(r.encoderGB), o: fmt(r.vaeGB + r.activationGB), tot: fmt(r.vramTotal) }) +
+    (N > 1 ? tr("dyn.vram.multi", { n: N, vram: gpu.vram_gb, total: fmt(r.totalVram) }) : tr("dyn.vram.single", { vram: gpu.vram_gb })) +
+    `<div class="dim" style="margin-top:4px">${tr("media.vram.tokens", { tok: r.tokens.toLocaleString() })}</div>`;
+
+  // Latency + the honesty badge that says where the number came from.
+  const basis = r.speedBasis;
+  const badge = `<span class="badge ${SPEED_BADGE[basis] || "no"}">${tr("media.basis." + basis)}</span>`;
+  if (r.secondsPerItem == null) {
+    el("mediaLatency").innerHTML = `<b>—</b> ${badge}` +
+      `<div class="dim">${tr(basis === "unmodelled" ? "media.nospeed.unet" : "media.nospeed.tflops", { gpu: gpuShortName })}</div>`;
+    el("mediaThroughput").innerHTML = `<b>—</b>`;
+  } else {
+    const s = r.secondsPerItem;
+    const pretty = s >= 60 ? tr("media.mmss", { m: Math.floor(s / 60), s: fmt(s % 60, 0) }) : `${fmt(s, s < 10 ? 2 : 1)}s`;
+    el("mediaLatency").innerHTML = `<b>${pretty}</b> <span class="dim">/ ${unit}</span> ${badge}` +
+      (N > 1 ? `<div class="dim">${tr("media.latency.nnote", { n: N })}</div>` : "");
+    el("mediaThroughput").innerHTML = `<b>${fmt(r.itemsPerHour, r.itemsPerHour < 10 ? 1 : 0)}</b> <span class="dim">${unit}/h</span>` +
+      `<div class="dim">${tr("media.batchnote")}</div>`;
+  }
+
+  renderMediaCost(r, model, gpu, N, unit, mode);
+  renderMediaMethod(r, model, gpu, refGpu, unit);
+}
+
+function renderMediaCost(r, model, gpu, N, unit, mode) {
+  const box = el("mediaCostBox");
+  if (r.secondsPerItem == null) { box.innerHTML = `<div class="dim">${tr("media.cost.nospeed")}</div>`; return; }
+
+  if (mode === "own") {
+    if (!r.ownAvailable) {
+      box.innerHTML = `<div class="dim">${isNaN(parseFloat(el("kwh").value)) ? tr("dyn.own.needkwh") : tr("media.own.needapi")}</div>`;
+      return;
+    }
+    const fleet = N > 1 ? ` (${N}×)` : "";
+    const pb = r.paybackMonths, recovers = pb != null;
+    box.innerHTML =
+      `<div class="cost-row"><span>${tr("dyn.own.capex")}${fleet}</span><b>$${fmt(r.capexFleet, 0)}</b></div>` +
+      `<div class="cost-row"><span>${tr("dyn.own.elec")} <span class="dim">(active ${fmt(r.activeHours, 0)} GPU-h · ${fmt(r.fleetKw, 2)}kW)</span></span><b>$${fmt(r.elecMonthly, 2)}</b></div>` +
+      (r.apiMonthly != null ? `<div class="cost-row"><span>${tr("dyn.own.apicost")}</span><b>$${fmt(r.apiMonthly, 2)}</b></div>` : "") +
+      (r.overSubscribed ? `<div class="cost-row" style="border:0"><span style="color:var(--k)">${tr("media.own.oversub", { max: fmt(r.maxMonthlyItems, 0), unit })}</span></div>` : "") +
+      (r.apiMonthly == null
+        ? `<div class="dim">${tr("media.own.needapi")}</div>`
+        : `<div class="verdict ${recovers ? "self" : "api"}">${recovers
+            ? tr("dyn.own.recovers", { pb: fmt(pb, 1), warn: pb > 60 ? tr("dyn.own.recovers.warn") : "" })
+            : tr("dyn.own.norecover")}</div>` + (recovers ? ownChartSVG(r.tcoSeries, pb) : ""));
+    return;
+  }
+
+  if (r.rent == null) {
+    const kind = gpu.kind === "apple" ? tr("dyn.cost.owned.apple") : gpu.kind === "npu" ? tr("dyn.cost.owned.npu") : tr("dyn.cost.owned.gen");
+    box.innerHTML = `<div class="dim">${tr("dyn.cost.owned", { kind, n: N > 1 ? tr("dyn.cost.ownedN", { N }) : "" })}</div>`;
+    return;
+  }
+  const fleet = N > 1 ? ` (${N}× $${fmt(r.rent, 2)} = $${fmt(r.fleetRentHr, 2)}/hr)` : ` ($${fmt(r.rent, 2)}/hr)`;
+  let html =
+    `<div class="cost-row"><span>${tr("media.cost.selfrate")}${fleet}</span><b>$${fmt(r.costPerItem, 4)} / ${unit}</b></div>` +
+    `<div class="cost-row dim"><span>${tr("media.cost.per1000", { unit })}</span><b>$${fmt(r.costPer1000, 2)}</b></div>`;
+  if (r.apiPerItem == null) {
+    // No verified list price for this modality — say so instead of comparing against a guess.
+    html += `<div class="dim">${tr("media.cost.noapi")}</div>`;
+  } else {
+    const cheaper = r.verdict === "self";
+    html += `<div class="cost-row"><span>${tr("media.cost.apirate")}</span><b>$${fmt(r.apiPerItem, 4)} / ${unit}</b></div>` +
+      `<div class="verdict ${cheaper ? "self" : "api"}">${cheaper
+        ? tr("media.cost.cheaper", { v: fmt(r.savingPerItem, 4), unit })
+        : tr("media.cost.apicheaper", { v: fmt(-r.savingPerItem, 4), unit })}</div>`;
+  }
+  box.innerHTML = html;
+}
+
+// The provenance block. Anyone reading a cost-per-image deserves to see which run it descends
+// from, at what settings, and on which device — otherwise the number is unfalsifiable.
+function renderMediaMethod(r, model, gpu, refGpu, unit) {
+  const m = model.measured || (model.measured_from
+    ? (state.media.find(x => x.id === model.measured_from) || {}).measured : null);
+  const rows = [];
+  if (m) {
+    const at = model.kind === "video"
+      ? tr("media.method.atvideo", { w: m.width, h: m.height, f: m.frames, s: m.steps })
+      : tr("media.method.atimage", { w: m.width, h: m.height, s: m.steps });
+    rows.push(tr("media.method.anchor", {
+      src: model.measured_from ? esc(model.measured_from) : esc(model.name),
+      gpu: esc((refGpu && refGpu.name.split(" (")[0]) || m.gpu), sec: m.seconds, at,
+    }));
+    rows.push(tr("media.method.scaled", { gpu: esc(gpu.name.split(" (")[0]), tf: fmt(gpu.tflops_bf16, 0) }));
+  } else if (r.speedBasis === "estimated") {
+    rows.push(tr("media.method.roofline", { mfu: Math.round(LLMCalc.MEDIA_MFU * 100) }));
+  }
+  rows.push(tr("media.method.flops", { g: fmt(LLMCalc.mediaFlops(model, r.tokens, r.steps, r.passes, 1) / 1e12, 0) }));
+  rows.push(tr("media.method.quant"));
+  el("mediaMethod").innerHTML = rows.map(x => `<div>${x}</div>`).join("");
 }
 
 // ---- vLLM serving-readiness tab -------------------------------------------
@@ -468,8 +686,89 @@ function renderSpark(model, gpu, context) {
   el("sparkNodeCards").innerHTML = f.perNode.map((n, i) => nodeCardHTML(n, i)).join("");
 }
 
+// Switch between text-LLM and the two diffusion modalities. The LLM path must come back
+// byte-identical when the user switches back, so nothing here mutates LLM state.
+function applyCategory(cat) {
+  state.cat = cat;
+  const media = isMedia();
+
+  el("llmOnlyInputs").hidden = media;
+  el("llmSliders").hidden = media;
+  el("mediaInputs").hidden = !media;
+  el("videoInputs").hidden = cat !== "video";
+  el("mtokRow").hidden = media;
+  el("mitemRow").hidden = !media;
+  el("apiLabelText").textContent = media ? tr(cat === "video" ? "lbl.api.clip" : "lbl.api.image") : tr("lbl.api");
+
+  // Model dropdown swaps source; keep the selection if the id still exists.
+  const prev = el("model").value;
+  el("model").innerHTML = "";
+  if (media) {
+    mediaList().forEach(m => {
+      const size = m.moe ? `${fmt(m.backbone_params_b, 0)}B·A${fmt(m.backbone_active_params_b, 0)}B` : `${fmt(m.backbone_params_b, 1)}B`;
+      const flag = m.blocked ? " ⛔" : "";
+      el("model").appendChild(opt(m.id, `${m.name} · ${size}${flag}`));
+    });
+  } else {
+    state.models.forEach(m => {
+      const tag = m.moe ? `${fmt(m.total_params_b, 0)}B·A${fmt(m.active_params_b, 0)}B MoE` : `${fmt(m.total_params_b, 0)}B`;
+      el("model").appendChild(opt(m.id, `${m.name} · ${tag} · ${m.released}`));
+    });
+  }
+  if ([...el("model").options].some(o => o.value === prev)) el("model").value = prev;
+
+  // API preset list is modality-specific.
+  el("apiPreset").innerHTML = "";
+  if (media) {
+    state.mediaPresets
+      .filter(p => p.kind === "any" || p.kind === cat)
+      .forEach((p, i) => el("apiPreset").appendChild(opt(String(i),
+        p.usd_per_item == null ? p.label : `${p.provider ? p.provider + " " : ""}${p.label} — $${p.usd_per_item}/${cat === "video" ? "clip" : "img"}`)));
+    const first = state.mediaPresets.filter(p => p.kind === "any" || p.kind === cat)[0];
+    el("api").value = first && first.usd_per_item != null ? first.usd_per_item : "";
+  } else {
+    state.apiPresets.forEach((p, i) => {
+      const io = (p.input != null && p.output != null) ? ` (in $${p.input} / out $${p.output})` : "";
+      el("apiPreset").appendChild(opt(i, `${p.provider ? p.provider + " " : ""}${p.label} — blended $${p.usd_per_1m}/1M${io}`));
+    });
+    el("apiPreset").value = "1";
+    el("api").value = state.apiPresets[1].usd_per_1m;
+  }
+
+  document.querySelectorAll("#resultTabs .tab").forEach(t => {
+    t.hidden = media ? t.dataset.cat !== "media" : t.dataset.cat !== "llm";
+  });
+  // Diffusion pipelines are served at bf16 or fp8; nobody runs a DiT at INT4/AWQ the way they do
+  // an LLM, and our own measurements are bf16. Carrying the LLM tab's int4 default across would
+  // quietly show a VRAM figure for a configuration that does not exist in practice.
+  if (media && ["int4", "nvfp4", "mxfp4"].includes(el("quant").value)) el("quant").value = "fp16";
+  if (media) applyMediaModelDefaults();
+  switchResultTab(media ? "media" : "calc");
+}
+
+// Pull the model card's own defaults into the controls when the selected media model changes,
+// including its resolution ladder (a 480p video model and a 1328px image model differ).
+function applyMediaModelDefaults() {
+  const model = mediaList().find(m => m.id === el("model").value) || mediaList()[0];
+  if (!model) return;
+  const isVideo = model.kind === "video";
+  const list = (isVideo ? VIDEO_RES : IMAGE_RES).slice();
+  const own = [model.width, model.height];
+  if (own[0] && !list.some(([w, h]) => w === own[0] && h === own[1])) list.push(own);
+  list.sort((a, b) => a[0] * a[1] - b[0] * b[1]);
+  el("resolution").innerHTML = "";
+  list.forEach(([w, h]) => el("resolution").appendChild(opt(`${w}x${h}`, `${w} × ${h}`)));
+  if (model.width) el("resolution").value = `${model.width}x${model.height}`;
+
+  el("steps").value = model.default_steps || 20;
+  el("cfg").checked = (model.cfg_passes || 1) > 1;
+  if (isVideo && model.frames) el("frames").value = model.frames;
+  el("videoInputs").hidden = !isVideo;
+}
+
 function switchResultTab(which) {
   document.querySelectorAll("#resultTabs .tab").forEach(t => t.classList.toggle("active", t.dataset.panel === which));
+  el("panelMedia").hidden = which !== "media";
   el("panelCalc").hidden = which !== "calc";
   el("panelVllm").hidden = which !== "vllm";
   el("panelSglang").hidden = which !== "sglang";
@@ -605,18 +904,29 @@ async function init() {
   el("api").value = state.apiPresets[1].usd_per_1m;
 
   el("apiPreset").addEventListener("change", () => {
-    const p = state.apiPresets[parseInt(el("apiPreset").value, 10)];
-    if (p) el("api").value = p.usd_per_1m;
+    if (isMedia()) {
+      const list = state.mediaPresets.filter(p => p.kind === "any" || p.kind === state.cat);
+      const p = list[parseInt(el("apiPreset").value, 10)];
+      el("api").value = p && p.usd_per_item != null ? p.usd_per_item : "";
+    } else {
+      const p = state.apiPresets[parseInt(el("apiPreset").value, 10)];
+      if (p) el("api").value = p.usd_per_1m;
+    }
     render();
   });
-  ["gpu", "quant", "context", "concurrency", "rent", "api", "kwh", "monthlyTokens", "capex"].forEach(id =>
-    el(id).addEventListener("input", render));
+  ["gpu", "quant", "context", "concurrency", "rent", "api", "kwh", "monthlyTokens", "capex",
+    "steps", "frames", "monthlyItems"].forEach(id => el(id).addEventListener("input", render));
+  ["resolution", "cfg"].forEach(id => el(id).addEventListener("change", render));
   document.querySelectorAll('input[name="costmode"]').forEach(radio => radio.addEventListener("change", render));
+
+  document.querySelectorAll('#catToggle input[name="cat"]').forEach(radio =>
+    radio.addEventListener("change", () => { applyCategory(radio.value); render(); }));
 
   // Selecting a curated model from the dropdown overrides any fetched HF model.
   el("model").addEventListener("change", () => {
     vllmState.fetched = null;
     el("hfRef").value = ""; el("hfRefStatus").textContent = ""; el("hfFetchBtn").hidden = true;
+    if (isMedia()) applyMediaModelDefaults();
     render();
   });
 

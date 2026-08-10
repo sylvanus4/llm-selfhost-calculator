@@ -120,6 +120,46 @@ if (doNetwork) {
   for (const url of links) { const st = await head(url); if (st === 0 || st >= 400) add("warn", "N2", `doc link unreachable (HTTP ${st}): ${url}`, "update the docs URL"); }
 }
 
+// ---- F7: image/video generation dataset -----------------------------------
+// The diffusion path can go wrong in ways the LLM checks do not cover: a model that silently
+// loses its measurement anchor, a licence restriction with no licence to read, a text encoder
+// that was forgotten (which is the single most common sizing error for these pipelines).
+{
+  const mm = read("data/media-models.json").models;
+  const gpuIds = new Set(read("data/gpus.json").gpus.map(g => g.id));
+  const seen = new Set();
+  for (const m of mm) {
+    if (seen.has(m.id)) add("error", "F7", `media model duplicate id "${m.id}"`, "ids must be unique");
+    seen.add(m.id);
+    if (!m.hf) add("error", "F7", `media model "${m.id}": no hf id`, "add the HuggingFace repo id");
+    if (!m.license_url) add("warn", "F7", `media model "${m.id}": no license_url`, "link the licence so users can read the terms");
+    if (!(m.backbone_params_b > 0)) add("error", "F7", `media model "${m.id}": backbone_params_b missing`, "derive it from the staged weights");
+    if (m.kind !== "image" && m.kind !== "video") add("error", "F7", `media model "${m.id}": kind must be image|video`, "set kind");
+    if (m.kind === "video" && !(m.frames > 0 && m.fps > 0)) add("error", "F7", `media model "${m.id}": video needs frames+fps`, "add them from the model card");
+    if (m.moe && !(m.backbone_active_params_b > 0)) add("error", "F7", `media model "${m.id}": MoE without an active size`, "add backbone_active_params_b");
+    if (m.text_encoder_params_b == null && m.speed_model !== "none")
+      add("warn", "F7", `media model "${m.id}": no text_encoder_params_b`, "text encoders are often a third of resident VRAM — omitting one understates the sizing");
+    if (m.restriction) {
+      if (!m.restriction.summary || !(m.restriction.territories || []).length)
+        add("error", "F7", `media model "${m.id}": restriction needs territories + summary`, "state where it may not run and why");
+      if (!m.license_url) add("error", "F7", `media model "${m.id}": restricted but no licence link`, "users must be able to read the clause themselves");
+    }
+    if (m.measured) {
+      if (!gpuIds.has(m.measured.gpu)) add("error", "F7", `media model "${m.id}": measured.gpu "${m.measured.gpu}" is not in gpus.json`, "anchor must reference a known device");
+      if (!(m.measured.seconds > 0 && m.measured.steps > 0)) add("error", "F7", `media model "${m.id}": measurement missing seconds/steps`, "an anchor without settings cannot be scaled");
+    }
+    if (m.measured_from) {
+      const s = mm.find(x => x.id === m.measured_from);
+      if (!s || !s.measured) add("error", "F7", `media model "${m.id}": measured_from "${m.measured_from}" has no measurement`, "point at a benchmarked sibling or drop the field");
+      else if (s.backbone_params_b !== m.backbone_params_b)
+        add("warn", "F7", `media model "${m.id}": borrows an anchor from a DIFFERENT-sized backbone (${s.backbone_params_b}B vs ${m.backbone_params_b}B)`, "only borrow across identical backbones");
+    }
+    if (m.measured && m.measured_from) add("error", "F7", `media model "${m.id}": has both measured and measured_from`, "pick one");
+  }
+  const anchored = mm.filter(x => x.measured).length;
+  if (!anchored) add("warn", "F7", "no media model has a measurement anchor", "every latency would be a roofline guess");
+}
+
 const bySev = { error: 0, warn: 0, info: 0 };
 findings.forEach(f => bySev[f.severity]++);
 const report = { generated_utc: new Date().toISOString(), network: doNetwork, counts: bySev, findings };

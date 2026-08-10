@@ -28,16 +28,27 @@
 <main id="app">
   <section class="panel inputs">
     <h2 data-i18n="inputs.h2">입력</h2>
+
+    <label><span data-i18n="lbl.category">모델 종류</span>
+      <div class="segmented" id="catToggle">
+        <label><input type="radio" name="cat" value="llm" checked> <span data-i18n="cat.llm">텍스트 LLM</span></label>
+        <label><input type="radio" name="cat" value="image"> <span data-i18n="cat.image">이미지 생성</span></label>
+        <label><input type="radio" name="cat" value="video"> <span data-i18n="cat.video">영상 생성</span></label>
+      </div>
+    </label>
+
     <label><span data-i18n="lbl.model">모델</span> <span class="hint" data-i18n="hint.newest">최신순</span> <select id="model"></select></label>
     <div class="chips" id="modelChips"></div>
     <div class="model-note" id="modelNote"></div>
 
+    <div id="llmOnlyInputs">
     <label><span data-i18n="lbl.hfref">또는 HF 모델 URL/ID</span> <span class="hint" data-i18n="hint.paste">붙여넣으면 파싱</span>
       <input type="text" id="hfRef" list="hfList" data-i18n-ph="ph.hfref" placeholder="huggingface.co/Qwen/Qwen3-8B 또는 Qwen/Qwen3-8B" autocomplete="off">
     </label>
     <datalist id="hfList"></datalist>
     <div class="model-note" id="hfRefStatus"></div>
     <button type="button" id="hfFetchBtn" class="fetch-btn" hidden data-i18n="btn.hffetch">HF에서 config.json 불러오기 (외부 요청)</button>
+    </div>
 
     <label><span data-i18n="lbl.quant">양자화</span> <span class="hint" data-i18n="hint.quant">4-bit는 아래 설명 참고</span>
       <select id="quant">
@@ -52,6 +63,7 @@
 
     <label><span data-i18n="lbl.hardware">하드웨어</span> <select id="gpu"></select></label>
 
+    <div id="llmSliders">
     <label><span data-i18n="lbl.context">컨텍스트 길이</span> <span class="lab" id="contextLabel"></span>
       <input type="range" id="context" min="2048" max="262144" step="2048" value="8192">
     </label>
@@ -59,6 +71,26 @@
     <label><span data-i18n="lbl.concurrency">동시 요청</span> <span class="lab" id="concurrencyLabel"></span>
       <input type="range" id="concurrency" min="1" max="128" step="1" value="16">
     </label>
+    </div>
+
+    <div id="mediaInputs" hidden>
+      <div class="row2">
+        <label><span data-i18n="lbl.steps">디노이징 스텝</span> <span class="lab" id="stepsLabel"></span>
+          <input type="range" id="steps" min="1" max="100" step="1" value="20">
+        </label>
+        <label><span data-i18n="lbl.resolution">해상도</span> <select id="resolution"></select></label>
+      </div>
+
+      <div id="videoInputs" hidden>
+        <label><span data-i18n="lbl.frames">프레임 수</span> <span class="lab" id="framesLabel"></span>
+          <input type="range" id="frames" min="9" max="361" step="8" value="121">
+        </label>
+      </div>
+
+      <label class="inline-check"><input type="checkbox" id="cfg">
+        <span data-i18n="lbl.cfg">CFG 사용 (스텝당 forward 2회)</span>
+      </label>
+    </div>
 
     <label><span data-i18n="lbl.costmode">원가 모드</span>
       <div class="segmented" id="costMode">
@@ -77,8 +109,11 @@
       <label><span data-i18n="lbl.kwh">전기 단가 ($/kWh)</span> <span class="hint" data-i18n="hint.kwh">KR 산업용 ≈ ₩150 ≈ $0.11</span>
         <input type="text" id="kwh" inputmode="decimal" value="0.12">
       </label>
-      <label><span data-i18n="lbl.mtok">월 예상 토큰량</span> <span class="lab" id="mtokLabel"></span>
+      <label id="mtokRow"><span data-i18n="lbl.mtok">월 예상 토큰량</span> <span class="lab" id="mtokLabel"></span>
         <input type="range" id="monthlyTokens" min="0.1" max="200" step="0.1" value="5">
+      </label>
+      <label id="mitemRow" hidden><span id="mitemLabelText" data-i18n="lbl.mitem">월 예상 생성량</span> <span class="lab" id="mitemLabel"></span>
+        <input type="range" id="monthlyItems" min="1" max="500" step="1" value="50">
       </label>
       <label><span data-i18n="lbl.capex">구매가 override ($/장비, 비우면 데이터 기본값)</span>
         <input type="text" id="capex" inputmode="decimal" data-i18n-ph="ph.capex" placeholder="예: 28000">
@@ -86,18 +121,19 @@
     </div>
 
     <label><span data-i18n="lbl.apipreset">비교 API 프리셋</span> <select id="apiPreset"></select></label>
-    <label><span data-i18n="lbl.api">비교 API 단가 ($/1M tok)</span>
+    <label><span id="apiLabelText" data-i18n="lbl.api">비교 API 단가 ($/1M tok)</span>
       <input type="text" id="api" inputmode="decimal" value="0.8">
     </label>
   </section>
 
   <section class="panel results">
     <div class="tabs" id="resultTabs">
-      <button type="button" class="tab active" data-panel="calc" data-i18n="tab.calc">비용 · 적합성</button>
-      <button type="button" class="tab" data-panel="spark" data-i18n="tab.spark">노드별 배치</button>
-      <button type="button" class="tab" data-panel="vllm" data-i18n="tab.vllm">vLLM 서빙 준비도</button>
-      <button type="button" class="tab" data-panel="sglang" data-i18n="tab.sglang">SGLang 서빙 준비도</button>
-      <button type="button" class="tab" data-panel="trt" data-i18n="tab.trt">TensorRT-LLM 서빙 준비도</button>
+      <button type="button" class="tab active" data-panel="calc" data-cat="llm" data-i18n="tab.calc">비용 · 적합성</button>
+      <button type="button" class="tab" data-panel="media" data-cat="media" hidden data-i18n="tab.media">비용 · 적합성</button>
+      <button type="button" class="tab" data-panel="spark" data-cat="llm" data-i18n="tab.spark">노드별 배치</button>
+      <button type="button" class="tab" data-panel="vllm" data-cat="llm" data-i18n="tab.vllm">vLLM 서빙 준비도</button>
+      <button type="button" class="tab" data-panel="sglang" data-cat="llm" data-i18n="tab.sglang">SGLang 서빙 준비도</button>
+      <button type="button" class="tab" data-panel="trt" data-cat="llm" data-i18n="tab.trt">TensorRT-LLM 서빙 준비도</button>
     </div>
     <div id="panelCalc">
     <h2><span data-i18n="calc.h2">결과</span> <span id="fitBadge"></span></h2>
@@ -119,6 +155,36 @@
       <div id="costBox"></div>
     </div>
     </div><!-- /panelCalc -->
+
+    <div id="panelMedia" hidden>
+      <h2><span data-i18n="calc.h2">결과</span> <span id="mediaFitBadge"></span></h2>
+
+      <div id="mediaBlocked" class="err" hidden></div>
+
+      <div id="mediaBody">
+        <div class="block">
+          <div class="block-title">VRAM</div>
+          <div class="vram-bar" id="mediaVramBar"></div>
+          <div class="legend"><span class="dot w"></span><span data-i18n="legend.backbone">백본</span> <span class="dot k"></span><span data-i18n="legend.textenc">텍스트 인코더</span> <span class="dot o"></span><span data-i18n="legend.vaeact">VAE·활성값</span> <span class="cap-legend"></span><span data-i18n="legend.vramcap">장비 VRAM 한계</span></div>
+          <div class="nums" id="mediaVramNums"></div>
+        </div>
+
+        <div class="block grid2">
+          <div><div class="block-title" data-i18n="media.latency">생성 시간</div><div id="mediaLatency"></div></div>
+          <div><div class="block-title" data-i18n="media.throughput">시간당 처리량</div><div id="mediaThroughput"></div></div>
+        </div>
+
+        <div class="block">
+          <div class="block-title" data-i18n="calc.selfvsapi">자체 호스팅 vs API</div>
+          <div id="mediaCostBox"></div>
+        </div>
+
+        <div class="block">
+          <div class="block-title" data-i18n="media.howtitle">이 숫자를 어떻게 계산했나</div>
+          <div class="nums" id="mediaMethod"></div>
+        </div>
+      </div>
+    </div><!-- /panelMedia -->
 
     <div id="panelVllm" hidden>
       <h2>vLLM <span data-i18n="tab.vllm">vLLM 서빙 준비도</span> <span id="vllmBadge"></span></h2>

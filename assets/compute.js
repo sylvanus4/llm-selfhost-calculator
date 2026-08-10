@@ -548,7 +548,191 @@
       note: entry.note || null, source, arch: arch || null };
   }
 
+  // ---- Diffusion serving: image / video generation -------------------------
+  //
+  // The physics is NOT the LLM one and the code must not pretend otherwise.
+  //   LLM decode  : memory-BANDWIDTH bound, one token at a time, KV cache grows with context,
+  //                 batching is the whole game (concurrency multiplies throughput).
+  //   Diffusion   : COMPUTE bound. Every denoising step is a full forward pass over ALL latent
+  //                 tokens. There is no KV cache. Batching buys almost nothing — measured on a
+  //                 single B200: Qwen-Image 2.51 -> 2.37 s/img (+6%) for VRAM 58 -> 87GB.
+  // So: latency scales with steps × latent tokens × model size ÷ device FLOPS, and the honest
+  // default batch is 1.
+  //
+  // Quantisation here reduces VRAM but is NOT modelled as a speedup, because our own measurement
+  // says fp8 alone is a LOSS (FLUX.2-klein 1.199 -> 1.451 s/img, 0.83×) — the win only appears
+  // when it is fused with torch.compile (0.699 s, 1.72×). Claiming a quant speedup would be a lie.
+  // MFU implied by our own single-B200 runs, back-solved through mediaFlops():
+  //   Z-Image-Turbo ~13% · FLUX.2-klein ~27% · LTX-2.3 ~45% · Qwen-Image ~64%.
+  // A 5× spread is exactly why a shared roofline cannot predict across models, and why a model
+  // WITH an anchor is scaled from its own measurement. This constant is only the fallback for
+  // models we have never run; it is deliberately near the low end so estimates are not flattering.
+  const MEDIA_MFU = 0.28;
+  const MEDIA_ACT_BASE_GB = 0.8; // CUDA context + allocator + scheduler workspace
+  const MEDIA_ACT_BUFFERS = 16;  // live per-token activation buffers (flash-attention assumed: O(N), not O(N²))
+
+  // Latent tokens fed to the backbone in ONE forward pass.
+  // Images: (W/vae/patch) × (H/vae/patch). Video adds a temporally-compressed frame axis.
+  function mediaLatentTokens(m, width, height, frames) {
+    const sp = m.vae_spatial || 8, patch = m.patch || 2;
+    const w = Math.max(1, Math.floor(width / sp / patch));
+    const h = Math.max(1, Math.floor(height / sp / patch));
+    if (m.kind !== "video") return w * h;
+    const t = m.vae_temporal || 4;
+    const nf = frames || m.frames || 1;
+    return w * h * Math.max(1, Math.floor((nf - 1) / t) + 1);
+  }
+
+  // FLOPs for a whole generation. Two terms, because for video the second one takes over:
+  //   dense  = 2 · P_active · N            per forward pass  (projections + MLP)
+  //   attn   = 4 · L · d · N²              per forward pass  (QK^T then AV)
+  // `passes` = forward passes per denoising step: 2 when classifier-free guidance evaluates the
+  // conditional and unconditional branches, 1 for distilled/CFG-free checkpoints. It is passed in
+  // rather than read off the model so the measured anchor can record what the BENCHMARK used
+  // (our image runs were CFG-free) independently of what the user is configuring now.
+  // `attn_layers` is the count of layers doing full self-attention over every latent token; it is 0
+  // for UNet models (SDXL), whose attention runs at downsampled resolutions and is not modelled.
+  function mediaFlops(m, tokens, steps, passes, batch) {
+    const P = (m.backbone_active_params_b != null ? m.backbone_active_params_b : m.backbone_params_b) * 1e9;
+    const L = m.attn_layers != null ? m.attn_layers : (m.n_layers || 0);
+    const d = m.hidden || 3072;
+    const dense = 2 * P * tokens;
+    const attn = 4 * L * d * tokens * tokens;
+    return (dense + attn) * steps * Math.max(1, passes || 1) * Math.max(1, batch);
+  }
+
+  function mediaTflops(gpu) {
+    return gpu && gpu.tflops_bf16 != null && gpu.tflops_bf16 > 0 ? gpu.tflops_bf16 : null;
+  }
+
+  // Seconds for one image / one clip.
+  // Preferred path is the MEASURED anchor: we scale our own benchmarked run by the FLOPs ratio
+  // and the device-FLOPS ratio, so the model's real (un-modelled) inefficiencies ride along.
+  // Without an anchor we fall back to a roofline estimate and the caller MUST label it as such —
+  // cross-model roofline does not predict these engines (measured: Z-Image 6B is SLOWER than
+  // Qwen-Image 20B at the same resolution and step count).
+  // Resolve the benchmark a model is scaled from. `measured_from` lets a variant borrow its
+  // sibling's run when they are the SAME backbone (verified identical component sizes on disk) —
+  // e.g. Qwen-Image-Edit/Layered share Qwen-Image's 20.43B DiT. Without this they would fall to the
+  // generic roofline and read ~2x slower than a model they are architecturally identical to.
+  function mediaAnchor(m, siblings) {
+    if (m.measured) return { meas: m.measured, from: null };
+    if (m.measured_from && siblings) {
+      const s = siblings.find(x => x.id === m.measured_from);
+      if (s && s.measured) return { meas: s.measured, from: s.id };
+    }
+    return { meas: null, from: null };
+  }
+
+  function mediaSeconds(m, gpu, tokens, steps, passes, batch, refGpu, siblings) {
+    // A UNet (SDXL) concentrates its parameters in low-resolution blocks, so "2·P·N over every
+    // latent token" overstates it by more than an order of magnitude. We have no benchmark of our
+    // own for that family, so we decline to print a latency rather than print a wrong one.
+    // VRAM is still exact — weights are weights — and that is the question people actually ask
+    // about SDXL on a consumer card.
+    if (m.speed_model === "none") return { seconds: null, basis: "unmodelled" };
+    const tf = mediaTflops(gpu);
+    if (tf == null) return { seconds: null, basis: "unknown" };
+    const flops = mediaFlops(m, tokens, steps, passes, batch);
+    const anchor = mediaAnchor(m, siblings);
+    const meas = anchor.meas;
+    if (meas && refGpu) {
+      const refTf = mediaTflops(refGpu);
+      if (refTf) {
+        const refTokens = mediaLatentTokens(m, meas.width, meas.height, meas.frames);
+        const refFlops = mediaFlops(m, refTokens, meas.steps, meas.cfg_passes || 1, meas.batch || 1);
+        if (refFlops > 0) {
+          const basis = anchor.from ? "measured-sibling" : (meas.approx ? "measured-approx" : "measured");
+          return { seconds: meas.seconds * (flops / refFlops) * (refTf / tf), basis, anchorFrom: anchor.from };
+        }
+      }
+    }
+    return { seconds: flops / (tf * 1e12 * MEDIA_MFU), basis: "estimated" };
+  }
+
+  // `own` mirrors compute(): { pricePerKwh, monthlyItems, capexOverride?, powerOverride? }.
+  // `apiPerItem` is USD per image / per clip (not per 1M tokens).
+  function computeMedia(model, gpu, quant, opts) {
+    const o = opts || {};
+    const steps = o.steps || model.default_steps || 20;
+    const width = o.width || model.width || 1024;
+    const height = o.height || model.height || 1024;
+    const frames = model.kind === "video" ? (o.frames || model.frames || 1) : 1;
+    const batch = Math.max(1, o.batch || 1);
+    const passes = o.cfg != null ? (o.cfg ? 2 : 1) : (model.cfg_passes || 1);
+    const bpp = BYTES_PER_PARAM[quant];
+
+    const tokens = mediaLatentTokens(model, width, height, frames);
+    // VAE stays at bf16 in practice (it is tiny and quantising it costs quality, not memory).
+    const backboneGB = model.backbone_params_b * bpp;
+    const encoderGB = (model.text_encoder_params_b || 0) * bpp;
+    const vaeGB = (model.vae_params_b || 0) * 2;
+    const weightsGB = backboneGB + encoderGB + vaeGB;
+    const activationGB = MEDIA_ACT_BASE_GB +
+      (tokens * (model.hidden || 3072) * 2 * MEDIA_ACT_BUFFERS * batch) / 1e9;
+    const vramTotal = weightsGB + activationGB;
+    const fits = vramTotal <= gpu.vram_gb;
+    const gpusNeeded = Math.max(1, Math.ceil(vramTotal / gpu.vram_gb));
+
+    const sp = mediaSeconds(model, gpu, tokens, steps, passes, batch, o.refGpu, o.siblings);
+    const secondsPerItem = sp.seconds != null && batch > 1 ? sp.seconds / batch : sp.seconds;
+    const itemsPerHour = secondsPerItem ? 3600 / secondsPerItem : null;
+
+    const rent = o.rentOverride != null && !isNaN(o.rentOverride) ? o.rentOverride : gpu.rent_usd_hr;
+    let fleetRentHr = null, costPerItem = null, apiPerItem = null, verdict = null, savingPerItem = null;
+    if (rent != null) {
+      fleetRentHr = rent * gpusNeeded;
+      if (secondsPerItem != null) costPerItem = (fleetRentHr / 3600) * secondsPerItem;
+    }
+    if (o.apiPerItem != null && !isNaN(o.apiPerItem)) {
+      apiPerItem = o.apiPerItem;
+      if (costPerItem != null) {
+        savingPerItem = apiPerItem - costPerItem;
+        verdict = costPerItem <= apiPerItem ? "self" : "api";
+      }
+    }
+
+    // Owned / on-prem payback, in items instead of tokens.
+    const own = o.own;
+    let ownAvailable = false, capexFleet = null, fleetKw = null, activeHours = null,
+      elecMonthly = null, apiMonthly = null, monthlyNetSaving = null, paybackMonths = null,
+      tcoSeries = null, overSubscribed = false, maxMonthlyItems = null;
+    if (own && own.monthlyItems > 0 && secondsPerItem != null && secondsPerItem > 0) {
+      const unitPrice = own.capexOverride != null && !isNaN(own.capexOverride) ? own.capexOverride : gpu.price_usd;
+      const unitPower = own.powerOverride != null && !isNaN(own.powerOverride) ? own.powerOverride : gpu.power_w;
+      const kwh = own.pricePerKwh;
+      if (unitPrice != null && unitPower != null && kwh != null && !isNaN(kwh)) {
+        ownAvailable = true;
+        capexFleet = unitPrice * gpusNeeded;
+        fleetKw = (unitPower * gpusNeeded) / 1000;
+        activeHours = (own.monthlyItems * secondsPerItem) / 3600;
+        maxMonthlyItems = Math.floor((730 * 3600) / secondsPerItem);
+        overSubscribed = activeHours > 730;
+        elecMonthly = fleetKw * activeHours * kwh;
+        apiMonthly = apiPerItem != null ? own.monthlyItems * apiPerItem : null;
+        if (apiMonthly != null) {
+          monthlyNetSaving = apiMonthly - elecMonthly;
+          paybackMonths = monthlyNetSaving > 0 ? capexFleet / monthlyNetSaving : null;
+          tcoSeries = [];
+          for (let mo = 0; mo <= 36; mo++)
+            tcoSeries.push({ month: mo, selfhost: capexFleet + elecMonthly * mo, api: apiMonthly * mo });
+        }
+      }
+    }
+
+    return { steps, width, height, frames, batch, passes, tokens, bpp,
+      backboneGB, encoderGB, vaeGB, weightsGB, activationGB, vramTotal, fits, gpusNeeded,
+      totalVram: gpusNeeded * gpu.vram_gb,
+      secondsPerItem, itemsPerHour, speedBasis: sp.basis,
+      rent, fleetRentHr, costPerItem, costPer1000: costPerItem != null ? costPerItem * 1000 : null,
+      apiPerItem, savingPerItem, verdict,
+      ownAvailable, capexFleet, fleetKw, activeHours, elecMonthly, apiMonthly,
+      monthlyNetSaving, paybackMonths, tcoSeries, overSubscribed, maxMonthlyItems };
+  }
+
   const api = { compute, BYTES_PER_PARAM, KV_BYTES, MBU, BATCH_EFF,
+    computeMedia, mediaLatentTokens, mediaFlops, mediaSeconds, mediaTflops, mediaAnchor,
+    MEDIA_MFU, MEDIA_ACT_BASE_GB, MEDIA_ACT_BUFFERS,
     engineVersionHistory, toolCallingConfig, toolFlagsFor,
     normalizeHfRef, vllmVerdict, buildServingSpec, servedName, vllmQuantFlag, detectQuantMethod,
     sglangVerdict, trtllmVerdict, buildSglangSpec, buildTrtllmSpec,

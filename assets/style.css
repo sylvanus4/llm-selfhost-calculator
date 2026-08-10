@@ -123,6 +123,24 @@ pre.code.small code { font-size: 11.5px; }
 .how li { margin: 6px 0; font-size: 14px; }
 footer { max-width: var(--maxw); margin: 24px auto; padding: 0 var(--pad) 40px; color: var(--dim); font-size: 12px; }
 footer a { color: var(--accent); }
+/* Two inputs per row — the diffusion tab adds four controls to an already-scrolling sidebar,
+   so pairing them keeps the cost-mode and API fields above the fold. */
+.row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 0 12px; align-items: end; }
+.row2 > label { min-width: 0; }
+.inline-check { display: flex; align-items: center; gap: 7px; font-size: 12px; margin-bottom: 14px; }
+.inline-check input { width: auto; margin: 0; }
+
+/* Weights + licence links, and the territory-restriction notice for models whose licence
+   limits where they may run. The notice warns; it never hides the numbers. */
+.reflinks { display: flex; flex-wrap: wrap; gap: 6px; }
+.reflink { font-size: 11px; font-family: var(--mono); color: var(--accent); background: var(--panel2);
+  border: 1px solid var(--border); padding: 3px 8px; border-radius: 999px; text-decoration: none; }
+.reflink:hover { border-color: var(--accent); }
+.reflink.dim { color: var(--dim); }
+.warn-box { background: color-mix(in srgb, var(--k) 10%, transparent); border: 1px solid var(--k);
+  padding: 12px 14px; border-radius: 8px; font-size: 12.5px; line-height: 1.55; margin-bottom: 14px; }
+.warn-box a { color: var(--accent); }
+
 .err { background: color-mix(in srgb, var(--no) 12%, transparent); border: 1px solid var(--no); padding: 16px; border-radius: 8px; grid-column: 1 / -1; }
 .err code { font-family: var(--mono); }
 

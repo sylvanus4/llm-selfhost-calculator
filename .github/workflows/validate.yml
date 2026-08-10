@@ -25,6 +25,8 @@ jobs:
         run: node test/versions-tools.test.cjs
       - name: Unit test new-model builder (offline fixtures, no fabrication)
         run: node test/add-model.test.cjs
+      - name: Unit test image/video (diffusion) core, dataset and honesty rails
+        run: node test/media.test.cjs
       - name: Health audit (structural — no error-severity problems)
         run: node test/health-audit.test.cjs
       - name: Validate generated manifests are well-formed YAML (vLLM + SGLang + TensorRT-LLM)
@@ -70,4 +72,7 @@ jobs:
           grep -q 'data-panel="spark"' index.html
           grep -q 'data-panel="sglang"' index.html
           grep -q 'data-panel="trt"' index.html
+          grep -q 'id="panelMedia"' index.html
+          grep -q 'id="catToggle"' index.html
+          grep -q 'data-panel="media"' index.html
           echo "html wiring ok"
