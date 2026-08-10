@@ -208,6 +208,19 @@ const SPEED_BADGE = { measured: "ok", "measured-sibling": "ok", "measured-approx
 
 // Weights + licence, both one click away. People evaluating a model want to open the repo and
 // read the actual terms, not take a calculator's word for either.
+// Self-host vs API as two bars against a shared scale. This is the question the calculator
+// exists to answer and it used to be two rows of text; a length you can compare at a glance
+// beats two numbers you have to divide in your head.
+function vsBars(selfVal, apiVal, unitLabel, digits) {
+  const max = Math.max(selfVal, apiVal) || 1;
+  const row = (label, v, cls) =>
+    `<div class="vs-row"><span class="vs-label">${label}</span>` +
+    `<span class="vs-bar"><span class="vs-fill ${cls}" style="transform:scaleX(${Math.max(0.02, v / max).toFixed(4)})"></span></span>` +
+    `<span class="vs-val">$${fmt(v, digits)}</span></div>`;
+  return row(tr("vs.self"), selfVal, "self") + row(tr("vs.api"), apiVal, "api") +
+    `<div class="dim" style="text-align:right">${esc(unitLabel)}</div>`;
+}
+
 function mediaLinks(model) {
   const hf = `<a class="reflink" href="https://huggingface.co/${esc(model.hf)}" target="_blank" rel="noopener">🤗 ${esc(model.hf)}</a>`;
   const lic = model.license_url
@@ -295,19 +308,23 @@ function renderSpeech() {
     (model.measured && model.measured.vram_gb
       ? `<div class="dim" style="margin-top:4px">${tr("speech.vram.measured")}</div>` : "");
 
-  const badge = `<span class="badge ${SPEED_BADGE[r.speedBasis] || "no"}">${tr("media.basis." + r.speedBasis)}</span>`;
+  // For speech the one number is the real-time multiple, and whether it clears 1.0x is the whole
+  // verdict for TTS — so a below-realtime model turns the hero amber rather than hiding it in prose.
+  el("mediaHeroTitle").textContent = tr("speech.realtime");
+  el("mediaBasisBadge").innerHTML = `<span class="badge ${SPEED_BADGE[r.speedBasis] || "no"}">${tr("media.basis." + r.speedBasis)}</span>`;
   if (r.realtime == null) {
-    el("mediaLatency").innerHTML = `<b>—</b> ${badge}<div class="dim">${tr("speech.nospeed")}</div>`;
-    el("mediaThroughput").innerHTML = "<b>—</b>";
+    el("mediaLatency").innerHTML = `<div class="hero-metric"><span class="hero-num none">—</span></div>`;
+    el("mediaThroughput").innerHTML = tr("speech.nospeed");
   } else {
     const slower = r.realtime < 1;
     el("mediaLatency").innerHTML =
-      `<b class="${slower ? "warn" : ""}">${fmt(r.realtime, r.realtime < 10 ? 2 : 0)}×</b> <span class="dim">${tr("speech.realtime")}</span> ${badge}` +
-      `<div class="dim">${tr("speech.perminute", { s: fmt(r.secondsPerAudioMinute, 1) })}${slower ? " · " + tr("speech.belowrealtime") : ""}</div>`;
+      `<div class="hero-metric"><span class="hero-num${slower ? " warn" : ""}">${fmt(r.realtime, r.realtime < 10 ? 2 : 0)}×</span>` +
+      `<span class="hero-unit">${tr("speech.realtime")}</span></div>`;
     el("mediaThroughput").innerHTML =
-      `<b>${fmt(r.audioHoursPerHour, 1)}</b> <span class="dim">${tr("speech.audiohours")}</span>` +
-      (r.concurrencyCapped ? `<div class="dim warn">${tr("speech.capped", { c: r.measuredCeiling })}</div>`
-        : `<div class="dim">${tr("speech.batchnote")}</div>`);
+      tr("speech.perminute", { s: fmt(r.secondsPerAudioMinute, 1) }) +
+      ` · ${tr("speech.hero.sub", { v: fmt(r.audioHoursPerHour, 1) })}` +
+      (slower ? `<br><span class="warn">${tr("speech.belowrealtime")}</span>` : "") +
+      `<br>${r.concurrencyCapped ? tr("speech.capped", { c: r.measuredCeiling }) : tr("speech.batchnote")}`;
   }
 
   renderSpeechCost(r, gpu, N, mode);
@@ -347,7 +364,7 @@ function renderSpeechCost(r, gpu, N, mode) {
   if (r.apiPerAudioHour == null) html += `<div class="dim">${tr("speech.cost.noapi")}</div>`;
   else {
     const cheaper = r.verdict === "self";
-    html += `<div class="cost-row"><span>${tr("media.cost.apirate")}</span><b>$${fmt(r.apiPerAudioHour, 4)} / ${tr("speech.audiohour")}</b></div>` +
+    html += vsBars(r.costPerAudioHour, r.apiPerAudioHour, `$ / ${tr("speech.audiohour")}`, 4) +
       `<div class="verdict ${cheaper ? "self" : "api"}">${cheaper
         ? tr("speech.cost.cheaper", { v: fmt(r.savingPerAudioHour, 3) })
         : tr("speech.cost.apicheaper", { v: fmt(-r.savingPerAudioHour, 3) })}</div>`;
@@ -461,19 +478,24 @@ function renderMedia() {
     `<div class="dim" style="margin-top:4px">${tr("media.vram.tokens", { tok: r.tokens.toLocaleString() })}</div>`;
 
   // Latency + the honesty badge that says where the number came from.
+  // One hero number — the thing the page exists to answer — with its provenance badge beside the
+  // title and everything else demoted to a sub-line.
   const basis = r.speedBasis;
-  const badge = `<span class="badge ${SPEED_BADGE[basis] || "no"}">${tr("media.basis." + basis)}</span>`;
+  el("mediaHeroTitle").textContent = tr("media.latency");
+  el("mediaBasisBadge").innerHTML = `<span class="badge ${SPEED_BADGE[basis] || "no"}">${tr("media.basis." + basis)}</span>`;
   if (r.secondsPerItem == null) {
-    el("mediaLatency").innerHTML = `<b>—</b> ${badge}` +
-      `<div class="dim">${tr(basis === "unmodelled" ? "media.nospeed.unet" : "media.nospeed.tflops", { gpu: gpuShortName })}</div>`;
-    el("mediaThroughput").innerHTML = `<b>—</b>`;
+    el("mediaLatency").innerHTML = `<div class="hero-metric"><span class="hero-num none">—</span></div>`;
+    el("mediaThroughput").innerHTML =
+      tr(basis === "unmodelled" ? "media.nospeed.unet" : "media.nospeed.tflops", { gpu: gpuShortName });
   } else {
     const s = r.secondsPerItem;
     const pretty = s >= 60 ? tr("media.mmss", { m: Math.floor(s / 60), s: fmt(s % 60, 0) }) : `${fmt(s, s < 10 ? 2 : 1)}s`;
-    el("mediaLatency").innerHTML = `<b>${pretty}</b> <span class="dim">/ ${unit}</span> ${badge}` +
-      (N > 1 ? `<div class="dim">${tr("media.latency.nnote", { n: N })}</div>` : "");
-    el("mediaThroughput").innerHTML = `<b>${fmt(r.itemsPerHour, r.itemsPerHour < 10 ? 1 : 0)}</b> <span class="dim">${unit}/h</span>` +
-      `<div class="dim">${tr("media.batchnote")}</div>`;
+    el("mediaLatency").innerHTML =
+      `<div class="hero-metric"><span class="hero-num">${pretty}</span><span class="hero-unit">/ ${unit}</span></div>`;
+    el("mediaThroughput").innerHTML =
+      tr("media.hero.sub", { v: fmt(r.itemsPerHour, r.itemsPerHour < 10 ? 1 : 0), unit }) +
+      (N > 1 ? ` · ${tr("media.latency.nnote", { n: N })}` : "") +
+      `<br>${tr("media.batchnote")}`;
   }
 
   state.lastMedia = r;
@@ -521,7 +543,7 @@ function renderMediaCost(r, model, gpu, N, unit, mode) {
     html += `<div class="dim">${tr("media.cost.noapi")}</div>`;
   } else {
     const cheaper = r.verdict === "self";
-    html += `<div class="cost-row"><span>${tr("media.cost.apirate")}</span><b>$${fmt(r.apiPerItem, 4)} / ${unit}</b></div>` +
+    html += vsBars(r.costPerItem, r.apiPerItem, `$ / ${unit}`, 4) +
       `<div class="verdict ${cheaper ? "self" : "api"}">${cheaper
         ? tr("media.cost.cheaper", { v: fmt(r.savingPerItem, 4), unit })
         : tr("media.cost.apicheaper", { v: fmt(-r.savingPerItem, 4), unit })}</div>`;
@@ -718,7 +740,27 @@ function renderMediaEngines() {
       (docs ? `<div style="margin-top:6px"><a href="${esc(docs)}" target="_blank" rel="noopener">${tr("serve.docs")}</a></div>` : "");
 
     el(p.cmd).innerHTML = servingSnippet(p.key, model, sup, meta);
+    setTabDot(p.key, sup.tier);
   }
+}
+
+// Mirror each engine's verdict onto its tab so you can see which paths are open without
+// clicking through five tabs. The dot is never the only carrier: it has a title, and the
+// panel behind it states the tier in words.
+const TAB_DOT = { native: "ok", partial: "warn", custom: "warn", transformers: "warn",
+  unsupported: "no", unknown: "no", incompatible: "no" };
+const ENGINE_TAB = { pytorch: "mpytorch", vllm: "mvllm", tensorrt: "mtrt" };
+
+function setTabDot(engineKey, tier) {
+  const tab = document.querySelector(`#resultTabs .tab[data-panel="${ENGINE_TAB[engineKey]}"]`);
+  if (!tab) return;
+  tab.querySelector(".tab-dot")?.remove();
+  const label = tr("rd.tier." + tier);
+  const dot = document.createElement("span");
+  dot.className = `tab-dot ${TAB_DOT[tier] || "no"}`;
+  dot.title = label;
+  tab.appendChild(dot);
+  tab.setAttribute("aria-label", `${tab.textContent.trim()} — ${label}`);
 }
 
 // A copy-pasteable snippet, or an honest explanation of why there isn't one.
@@ -1105,18 +1147,26 @@ function applyCategory(cat) {
 
   // API preset list is modality-specific.
   el("apiPreset").innerHTML = "";
+  // Default to the first preset that actually carries a price, not the "Custom" placeholder —
+  // otherwise the self-host-vs-API comparison, the whole point of the panel, is blank on arrival.
+  const pickPriced = (list, field) => {
+    const i = list.findIndex(p => p[field] != null);
+    return i >= 0 ? i : 0;
+  };
   if (speech) {
-    speechPresetList().forEach((p, i) => el("apiPreset").appendChild(opt(String(i),
+    const list = speechPresetList();
+    list.forEach((p, i) => el("apiPreset").appendChild(opt(String(i),
       p.usd_per_min == null ? p.label : `${p.provider ? p.provider + " " : ""}${p.label} — $${p.usd_per_min}/min`)));
-    const first = speechPresetList()[0];
-    el("api").value = first && first.usd_per_min != null ? first.usd_per_min : "";
+    const idx = pickPriced(list, "usd_per_min");
+    el("apiPreset").value = String(idx);
+    el("api").value = list[idx] && list[idx].usd_per_min != null ? list[idx].usd_per_min : "";
   } else if (media) {
-    state.mediaPresets
-      .filter(p => p.kind === "any" || p.kind === cat)
-      .forEach((p, i) => el("apiPreset").appendChild(opt(String(i),
-        p.usd_per_item == null ? p.label : `${p.provider ? p.provider + " " : ""}${p.label} — $${p.usd_per_item}/${cat === "video" ? "clip" : "img"}`)));
-    const first = state.mediaPresets.filter(p => p.kind === "any" || p.kind === cat)[0];
-    el("api").value = first && first.usd_per_item != null ? first.usd_per_item : "";
+    const list = state.mediaPresets.filter(p => p.kind === "any" || p.kind === cat);
+    list.forEach((p, i) => el("apiPreset").appendChild(opt(String(i),
+      p.usd_per_item == null ? p.label : `${p.provider ? p.provider + " " : ""}${p.label} — $${p.usd_per_item}/${cat === "video" ? "clip" : "img"}`)));
+    const idx = pickPriced(list, "usd_per_item");
+    el("apiPreset").value = String(idx);
+    el("api").value = list[idx] && list[idx].usd_per_item != null ? list[idx].usd_per_item : "";
   } else {
     state.apiPresets.forEach((p, i) => {
       const io = (p.input != null && p.output != null) ? ` (in $${p.input} / out $${p.output})` : "";

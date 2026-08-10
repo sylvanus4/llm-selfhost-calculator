@@ -320,5 +320,56 @@ console.log("\nplacement gate:");
     C.placement(8, 1, null).throughput === null);
 }
 
+// ---- 10. visual hierarchy + status signal --------------------------------
+// Both of these shipped broken once: the headline number rendered at body size because the 22px
+// rule only covered the LLM panel, and the comparison bars painted nothing because a <span>
+// defaults to display:inline and silently ignores width/height.
+const css = fs.readFileSync(path.join(root, "assets/style.css"), "utf8");
+console.log("\nhierarchy gate:");
+{
+  const hero = css.match(/\.hero-num\s*\{[^}]*\}/);
+  ok("a hero-number style exists", !!hero);
+  const px = hero && hero[0].match(/font-size:\s*(\d+)px/);
+  ok("the hero number is far larger than body text (>=32px)", !!px && Number(px[1]) >= 32,
+    px ? px[1] + "px" : "no font-size");
+  ok("the hero number uses tabular figures so it does not jitter as values change",
+    !!hero && /tabular-nums/.test(hero[0]));
+  ok("both media and speech render the headline through the hero style",
+    (app.match(/hero-num/g) || []).length >= 3);
+  ok("the provenance badge sits with the hero, not buried in prose",
+    /mediaBasisBadge/.test(app) && /id="mediaBasisBadge"/.test(html));
+}
+{
+  const fill = css.match(/\.vs-fill\s*\{[^}]*\}/);
+  ok("comparison-bar fill style exists", !!fill);
+  // The bug: a span is inline by default, so width/height do nothing and the bar paints empty.
+  ok("the bar fill is blockified (an inline span would ignore width/transform)",
+    !!fill && /display:\s*(block|flex|inline-block)/.test(fill[0]));
+  // [[ui-templates]]: animate transform/opacity only — width/height animation forces layout.
+  ok("the bar animates transform, not width/height",
+    !!fill && /transition:\s*transform/.test(fill[0]) && !/transition:[^;]*\b(width|height)\b/.test(fill[0]));
+  ok("no `transition: all` and no ease/linear timing in the new styles",
+    !/transition:\s*all\b/.test(css) &&
+    !/transition:[^;]*\b(ease|linear)\s*[;}]/.test(css.slice(css.indexOf(".hero-num"))));
+  ok("self-host vs API renders as bars in both media and speech",
+    (app.match(/vsBars\(/g) || []).length >= 3);
+}
+{
+  ok("serving tabs carry a status dot driven by the tier", /setTabDot/.test(app) && /TAB_DOT/.test(app));
+  ok("the dot is not the only carrier — it has a title and an aria-label",
+    /dot\.title = label/.test(app) && /setAttribute\("aria-label"/.test(app));
+  ok("every tier maps to a dot colour",
+    ["native", "partial", "custom", "transformers", "unsupported", "unknown", "incompatible"]
+      .every(t => new RegExp(`${t}:\\s*"(ok|warn|no)"`).test(app)));
+}
+{
+  // The comparison is the reason the panel exists; it must not be blank on arrival.
+  const prices = JSON.parse(fs.readFileSync(path.join(root, "data/api-prices.json")));
+  ok("at least one media preset and one speech preset carry a real price",
+    (prices.media_presets || []).some(p => p.usd_per_item != null) &&
+    (prices.speech_presets || []).some(p => p.usd_per_min != null));
+  ok("the UI defaults to a priced preset rather than the Custom placeholder", /pickPriced/.test(app));
+}
+
 console.log(`\nmedia+speech+serving: ${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

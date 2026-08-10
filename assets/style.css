@@ -135,6 +135,43 @@ footer a { color: var(--accent); }
 .inline-check { display: flex; align-items: center; gap: 7px; font-size: 12px; margin-bottom: 14px; }
 .inline-check input { width: auto; margin: 0; }
 
+
+/* ---- A: hierarchy + status signal (image / video / speech) ----
+   The answer on this screen is ONE number. It used to render at body size because the 22px rule
+   only covered the LLM panel, so the thing a person came for looked like a label. */
+.hero-metric { display: flex; align-items: baseline; gap: 9px; flex-wrap: wrap; margin: 2px 0 2px; }
+.hero-num { font-family: var(--mono); font-size: 44px; font-weight: 600; line-height: 1.02;
+  letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
+.hero-num.warn { color: var(--k); }
+.hero-num.none { color: var(--dim); }
+.hero-unit { font-size: 15px; color: var(--dim); }
+.hero-sub { font-size: 12.5px; color: var(--dim); margin-top: 7px; line-height: 1.5; }
+@media (max-width: 560px) { .hero-num { font-size: 34px; } }
+
+/* Status dot on the serving tabs: which engines are actually open for THIS model, without
+   opening each tab. Colour is never the only carrier — the dot has a title and the tab's own
+   panel states the tier in words. */
+.tab-dot { display: inline-block; width: 6px; height: 6px; border-radius: 50%; margin-left: 5px;
+  vertical-align: middle; }
+.tab-dot.ok { background: var(--ok); }
+.tab-dot.warn { background: var(--k); }
+.tab-dot.no { background: var(--o); }
+
+/* Self-host vs API is the question the page exists to answer; it was two rows of text. */
+.vs-row { display: grid; grid-template-columns: 92px 1fr 96px; gap: 10px; align-items: center;
+  margin: 7px 0; font-size: 13px; }
+.vs-label { color: var(--dim); }
+.vs-bar { height: 15px; background: var(--panel2); border-radius: 4px; overflow: hidden; }
+/* Full-width and scaled on the compositor: animating width would trigger layout every frame,
+   which [[ui-templates]] bans. transform-origin keeps it growing from the left. */
+.vs-fill { display: block; width: 100%; height: 100%; border-radius: 4px;
+  transform-origin: left center; transform: scaleX(0);
+  transition: transform 220ms cubic-bezier(0.16,1,0.3,1); }
+.vs-fill.self { background: var(--accent); }
+.vs-fill.api { background: var(--k); }
+.vs-val { font-family: var(--mono); text-align: right; font-variant-numeric: tabular-nums; font-weight: 600; }
+@media (prefers-reduced-motion: reduce) { .vs-fill { transition: none; } }
+
 /* Weights + licence links, and the territory-restriction notice for models whose licence
    limits where they may run. The notice warns; it never hides the numbers. */
 .reflinks { display: flex; flex-wrap: wrap; gap: 6px; }
