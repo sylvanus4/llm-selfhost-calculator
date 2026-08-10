@@ -81,20 +81,100 @@
       "usd_per_1m": 1.56
     }
   ],
-  "_note_media": "Per-ITEM prices for hosted image/video generation, USD per image or per clip. Only figures we could verify are shipped: most vendors price image generation per output TOKEN (OpenAI gpt-image) or bundle it into a subscription, which does not convert to a per-image number without assuming a resolution, so we refuse to invent one. When no preset fits, type your own quote — the calculator's self-host $/item stands on its own and the API column is purely a comparison. Video per-clip list prices move constantly and none were verifiable at the time of writing, so the video presets are intentionally empty rather than fabricated.",
+  "_note_media": "Per-item prices for hosted image/video generation. IMAGE presets are USD per image, quoted from the vendor's own per-image figures. VIDEO presets are USD per SECOND (the unit video APIs actually bill in); the calculator multiplies by the clip length implied by your frame count and fps, so a 10s clip costs twice a 5s one. Pick the tier that matches what your self-hosted model actually produces — comparing a 20B DiT at 50 steps against a vendor's cheapest low-quality tier is not a like-for-like comparison, and neither is comparing it against 4K. OpenAI figures are from the image-generation guide's per-image table (gpt-image-2 bills image output tokens at $30/1M; note their own table shows a larger non-square resolution can cost LESS than 1024x1024). Google figures are from the Gemini API pricing page. All video models listed by Google include audio by default.",
   "media_presets": [
+    {
+      "label": "gpt-image-2 · medium 1024x1024",
+      "provider": "OpenAI",
+      "usd_per_item": 0.053,
+      "kind": "image",
+      "source": "https://developers.openai.com/api/docs/guides/image-generation"
+    },
+    {
+      "label": "gpt-image-2 · high 1024x1024",
+      "provider": "OpenAI",
+      "usd_per_item": 0.211,
+      "kind": "image",
+      "source": "https://developers.openai.com/api/docs/guides/image-generation"
+    },
+    {
+      "label": "gpt-image-2 · high 1536x1024",
+      "provider": "OpenAI",
+      "usd_per_item": 0.165,
+      "kind": "image",
+      "note": "Their table shows the wider non-square resolution costing less than the square one.",
+      "source": "https://developers.openai.com/api/docs/guides/image-generation"
+    },
+    {
+      "label": "gpt-image-2 · low 1024x1024",
+      "provider": "OpenAI",
+      "usd_per_item": 0.006,
+      "kind": "image",
+      "source": "https://developers.openai.com/api/docs/guides/image-generation"
+    },
+    {
+      "label": "Gemini 3 Pro Image · 1K/2K",
+      "provider": "Google",
+      "usd_per_item": 0.134,
+      "kind": "image",
+      "source": "https://ai.google.dev/gemini-api/docs/pricing"
+    },
+    {
+      "label": "Gemini 3.1 Flash Image · 1K",
+      "provider": "Google",
+      "usd_per_item": 0.067,
+      "kind": "image",
+      "source": "https://ai.google.dev/gemini-api/docs/pricing"
+    },
+    {
+      "label": "grok-imagine",
+      "provider": "xAI",
+      "usd_per_item": 0.02,
+      "kind": "image",
+      "note": "Budget consumer tier — not quality-comparable with a 20B DiT.",
+      "source": "data/speech.json image table"
+    },
+    {
+      "label": "Gemini Omni Flash · 720p",
+      "provider": "Google",
+      "usd_per_second": 0.1,
+      "kind": "video",
+      "note": "Output video billed at $17.50/1M tokens, which Google states is about $0.10 per second at 720p. Audio included.",
+      "source": "https://ai.google.dev/gemini-api/docs/pricing"
+    },
+    {
+      "label": "Veo 3.1 Fast · 720p",
+      "provider": "Google",
+      "usd_per_second": 0.1,
+      "kind": "video",
+      "source": "https://ai.google.dev/gemini-api/docs/pricing"
+    },
+    {
+      "label": "Veo 3.1 Fast · 1080p",
+      "provider": "Google",
+      "usd_per_second": 0.12,
+      "kind": "video",
+      "source": "https://ai.google.dev/gemini-api/docs/pricing"
+    },
+    {
+      "label": "Veo 3.1 · 720p/1080p",
+      "provider": "Google",
+      "usd_per_second": 0.4,
+      "kind": "video",
+      "source": "https://ai.google.dev/gemini-api/docs/pricing"
+    },
+    {
+      "label": "Veo 3.1 Lite · 720p",
+      "provider": "Google",
+      "usd_per_second": 0.05,
+      "kind": "video",
+      "source": "https://ai.google.dev/gemini-api/docs/pricing"
+    },
     {
       "label": "Custom — enter your own quote",
       "provider": null,
       "usd_per_item": null,
       "kind": "any"
-    },
-    {
-      "label": "grok-imagine image",
-      "provider": "xAI",
-      "usd_per_item": 0.02,
-      "kind": "image",
-      "note": "Per-image list price at 1K/2K output. Source: the image API table in data/speech.json (2026-07 official list price)."
     }
   ],
   "_note_speech": "Per-MINUTE prices for hosted speech APIs, USD per minute of audio — the unit STT/TTS vendors actually bill in. Derived from the curated table in data/speech.json (2026-07 official list prices); hourly quotes were divided by 60 and are marked. Rows priced per audio-token or per character do not convert to a per-minute figure without assuming a speaking rate, so they are omitted rather than estimated. Override with your own quote in the UI.",

@@ -720,7 +720,11 @@
       }
     }
 
-    return { steps, width, height, frames, batch, passes, tokens, bpp,
+    // Video APIs bill per SECOND of output, so the clip length implied by the current frame count
+    // is what turns their rate into a comparable per-clip price.
+    const clipSeconds = model.kind === "video" && model.fps ? frames / model.fps : null;
+
+    return { steps, width, height, frames, batch, passes, tokens, bpp, clipSeconds,
       backboneGB, encoderGB, vaeGB, weightsGB, activationGB, vramTotal, fits, gpusNeeded,
       totalVram: gpusNeeded * gpu.vram_gb,
       secondsPerItem, itemsPerHour, speedBasis: sp.basis,

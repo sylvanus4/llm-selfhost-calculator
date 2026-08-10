@@ -363,6 +363,30 @@ console.log("\nhierarchy gate:");
       .every(t => new RegExp(`${t}:\\s*"(ok|warn|no)"`).test(app)));
 }
 {
+  // A comparison against a mismatched tier is worse than none: a 20B DiT judged against a
+  // vendor's cheapest consumer tier will always "lose", which tells the user nothing.
+  const prices = JSON.parse(fs.readFileSync(path.join(root, "data/api-prices.json")));
+  const mp = prices.media_presets || [];
+  const img = mp.filter(p => p.kind === "image"), vid = mp.filter(p => p.kind === "video");
+  ok("image presets cover a frontier-quality tier, not only budget ones",
+    img.some(p => p.usd_per_item >= 0.05));
+  ok("video presets exist and are priced per SECOND (how video APIs bill)",
+    vid.length > 0 && vid.every(p => p.usd_per_second > 0 && p.usd_per_item == null));
+  ok("every priced media preset cites a source", mp.every(p =>
+    (p.usd_per_item == null && p.usd_per_second == null) || p.source));
+  ok("the app converts a per-second rate into a per-clip price using clip length",
+    /mediaPresetPerItem/.test(app) && /usd_per_second/.test(app) && /clipSeconds/.test(app));
+  ok("computeMedia exposes the clip length that conversion depends on",
+    /clipSeconds/.test(fs.readFileSync(path.join(root, "assets/compute.js"), "utf8")));
+  {
+    // Doubling the frame count must double the API side, since it bills per second.
+    const m = media.find(x => x.id === "ltx-2.3");
+    const a1 = C.computeMedia(m, g("h200"), "fp16", { frames: 121, refGpu: REF, siblings: media });
+    const a2 = C.computeMedia(m, g("h200"), "fp16", { frames: 241, refGpu: REF, siblings: media });
+    ok("clip length scales with frame count", a2.clipSeconds > a1.clipSeconds * 1.9);
+  }
+}
+{
   // The comparison is the reason the panel exists; it must not be blank on arrival.
   const prices = JSON.parse(fs.readFileSync(path.join(root, "data/api-prices.json")));
   ok("at least one media preset and one speech preset carry a real price",

@@ -229,6 +229,21 @@ function mediaLinks(model) {
   return `<div class="reflinks">${hf}${lic}</div>`;
 }
 
+// A video preset quotes $/second because that is how those APIs bill; turn it into a per-clip
+// price using the clip length the user is actually configuring, so a 10s clip costs twice a 5s one.
+function mediaPresetPerItem(preset, clipSeconds) {
+  if (!preset) return null;
+  if (preset.usd_per_item != null) return preset.usd_per_item;
+  if (preset.usd_per_second != null && clipSeconds) return preset.usd_per_second * clipSeconds;
+  return null;
+}
+function mediaPresetList(cat) {
+  return state.mediaPresets.filter(p => p.kind === "any" || p.kind === (cat || state.cat));
+}
+function currentMediaPreset() {
+  return mediaPresetList()[parseInt(el("apiPreset").value, 10)] || null;
+}
+
 function speechPresetList() {
   const k = (currentMediaModel() || {}).kind;
   return state.speechPresets.filter(p => p.kind === "any" || p.kind === k);
@@ -443,13 +458,22 @@ function renderMedia() {
   const rentRaw = el("rent").value.trim();
   const apiRaw = el("api").value.trim();
 
+  // For a per-second video preset the field holds the RATE, so it has to be scaled by clip length.
+  const preset = currentMediaPreset();
+  const clipSeconds = isVideo && model.fps ? frames / model.fps : null;
+  const perSecond = preset && preset.usd_per_second != null && apiRaw !== ""
+    ? parseFloat(apiRaw) : null;
+  const apiPerItem = apiRaw === "" ? null
+    : perSecond != null && clipSeconds ? perSecond * clipSeconds : parseFloat(apiRaw);
+
   const r = LLMCalc.computeMedia(model, gpu, quant, {
     steps, width: w, height: h, frames, batch: 1, cfg: el("cfg").checked,
     rentOverride: rentRaw === "" ? null : parseFloat(rentRaw),
-    apiPerItem: apiRaw === "" ? null : parseFloat(apiRaw),
+    apiPerItem,
     refGpu, siblings: state.media,
     own: mode === "own" ? mediaOwnInput() : null,
   });
+  r.apiPerSecond = perSecond;
   const N = r.gpusNeeded;
 
   el("stepsLabel").textContent = `${steps} steps`;
@@ -544,6 +568,9 @@ function renderMediaCost(r, model, gpu, N, unit, mode) {
   } else {
     const cheaper = r.verdict === "self";
     html += vsBars(r.costPerItem, r.apiPerItem, `$ / ${unit}`, 4) +
+      (r.apiPerSecond != null && r.clipSeconds
+        ? `<div class="dim">${tr("media.cost.persec", { rate: fmt(r.apiPerSecond, 2), s: fmt(r.clipSeconds, 2) })}</div>`
+        : "") +
       `<div class="verdict ${cheaper ? "self" : "api"}">${cheaper
         ? tr("media.cost.cheaper", { v: fmt(r.savingPerItem, 4), unit })
         : tr("media.cost.apicheaper", { v: fmt(-r.savingPerItem, 4), unit })}</div>`;
@@ -1121,7 +1148,7 @@ function applyCategory(cat) {
   el("mitemRow").hidden = !diffusion;
   el("maudioRow").hidden = !speech;
   el("apiLabelText").textContent = speech ? tr("lbl.api.min")
-    : media ? tr(cat === "video" ? "lbl.api.clip" : "lbl.api.image") : tr("lbl.api");
+    : media ? tr(cat === "video" ? "lbl.api.sec" : "lbl.api.image") : tr("lbl.api");
 
   // Model dropdown swaps source; keep the selection if the id still exists.
   const prev = el("model").value;
@@ -1161,12 +1188,18 @@ function applyCategory(cat) {
     el("apiPreset").value = String(idx);
     el("api").value = list[idx] && list[idx].usd_per_min != null ? list[idx].usd_per_min : "";
   } else if (media) {
-    const list = state.mediaPresets.filter(p => p.kind === "any" || p.kind === cat);
-    list.forEach((p, i) => el("apiPreset").appendChild(opt(String(i),
-      p.usd_per_item == null ? p.label : `${p.provider ? p.provider + " " : ""}${p.label} — $${p.usd_per_item}/${cat === "video" ? "clip" : "img"}`)));
-    const idx = pickPriced(list, "usd_per_item");
+    const list = mediaPresetList(cat);
+    list.forEach((p, i) => {
+      const price = p.usd_per_second != null ? `$${p.usd_per_second}/s`
+        : p.usd_per_item != null ? `$${p.usd_per_item}/img` : null;
+      el("apiPreset").appendChild(opt(String(i),
+        price ? `${p.provider ? p.provider + " " : ""}${p.label} — ${price}` : p.label));
+    });
+    const idx = Math.max(0, list.findIndex(p => p.usd_per_item != null || p.usd_per_second != null));
     el("apiPreset").value = String(idx);
-    el("api").value = list[idx] && list[idx].usd_per_item != null ? list[idx].usd_per_item : "";
+    const chosen = list[idx];
+    const v = chosen ? (chosen.usd_per_item != null ? chosen.usd_per_item : chosen.usd_per_second) : null;
+    el("api").value = v != null ? v : "";
   } else {
     state.apiPresets.forEach((p, i) => {
       const io = (p.input != null && p.output != null) ? ` (in $${p.input} / out $${p.output})` : "";
@@ -1353,9 +1386,9 @@ async function init() {
       const p = speechPresetList()[parseInt(el("apiPreset").value, 10)];
       el("api").value = p && p.usd_per_min != null ? p.usd_per_min : "";
     } else if (isMedia()) {
-      const list = state.mediaPresets.filter(p => p.kind === "any" || p.kind === state.cat);
-      const p = list[parseInt(el("apiPreset").value, 10)];
-      el("api").value = p && p.usd_per_item != null ? p.usd_per_item : "";
+      const p = currentMediaPreset();
+      const v = p ? (p.usd_per_item != null ? p.usd_per_item : p.usd_per_second) : null;
+      el("api").value = v != null ? v : "";
     } else {
       const p = state.apiPresets[parseInt(el("apiPreset").value, 10)];
       if (p) el("api").value = p.usd_per_1m;
