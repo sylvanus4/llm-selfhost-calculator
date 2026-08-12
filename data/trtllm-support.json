@@ -89,6 +89,7 @@
   "tool_calling": {
     "_note": "TensorRT-LLM 툴 콜링은 최신 trtllm-serve(PyTorch 백엔드)의 OpenAI 호환 API에서 --tool_call_parser로 지원되며 vLLM/SGLang보다 커버리지가 좁습니다. reasoning 파서 노출은 제한적 — 대개 chat_template로 처리. 미확인 아키텍처는 실측 필요.",
     "_default": {"tool_parser": null, "reasoning_parser": null, "note": {"ko": "이 아키텍처의 TensorRT-LLM 툴 파서는 미확인 — trtllm-serve OpenAI API 문서와 모델 chat_template를 확인하세요(vLLM/SGLang이 더 넓게 지원).", "en": "No confirmed TensorRT-LLM tool parser for this architecture — check the trtllm-serve OpenAI API docs and the model chat_template (vLLM/SGLang cover more)."}},
+    "KimiK3ForConditionalGeneration": {"tool_parser": "kimi_k3", "reasoning_parser": null, "note": {"ko": "--tool_call_parser kimi_k3 — TensorRT-LLM 소스 레지스트리(kimi_k3_tool_parser + ToolParserFactory \"kimi_k3\", 전용 단위테스트)에서 확인. reasoning 파서는 미확인.", "en": "--tool_call_parser kimi_k3 — confirmed in the TensorRT-LLM source registry (kimi_k3_tool_parser + ToolParserFactory \"kimi_k3\", dedicated unit test). No confirmed reasoning parser."}},
     "LlamaForCausalLM": {"tool_parser": "llama3_json", "reasoning_parser": null},
     "Llama4ForConditionalGeneration": {"tool_parser": "llama3_json", "reasoning_parser": null},
     "MistralForCausalLM": {"tool_parser": "mistral", "reasoning_parser": null},
