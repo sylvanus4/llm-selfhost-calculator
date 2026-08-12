@@ -734,6 +734,56 @@
       monthlyNetSaving, paybackMonths, tcoSeries, overSubscribed, maxMonthlyItems };
   }
 
+  // ---- Quant ladder for the non-LLM modalities ------------------------------
+  //
+  // Same visual grammar as the LLM Spark ladder (bar = vs usable, green fit, red overflow), with
+  // each modality's own VRAM physics. Quantisation MOVES VRAM ONLY here — it is deliberately NOT
+  // modelled as a speedup (measured: fp8 alone was 0.83x on FLUX.2-klein; the win only appears
+  // fused with torch.compile), so a ladder row shows fit and GPU count, never a speed claim.
+  // Tiers are the arithmetic what-if grid; published checkpoints (model.quants) annotate rows.
+  const MEDIA_QUANT_TIERS = [
+    { id: "fp16", label: "BF16 / FP16" },
+    { id: "fp8", label: "FP8" },
+    { id: "int8", label: "INT8 / Q8" },
+    { id: "int4", label: "INT4 / Q4" },
+  ];
+
+  function mediaQuantLadder(model, gpu, opts) {
+    const o = opts || {};
+    const width = o.width || model.width || 1024, height = o.height || model.height || 1024;
+    const frames = model.kind === "video" ? (o.frames || model.frames || 1) : 1;
+    const batch = Math.max(1, o.batch || 1);
+    const tokens = mediaLatentTokens(model, width, height, frames);
+    // Activation memory is dtype-of-compute, not dtype-of-weights: it does not shrink with quant.
+    const activationGB = MEDIA_ACT_BASE_GB +
+      (tokens * (model.hidden || 3072) * 2 * MEDIA_ACT_BUFFERS * batch) / 1e9;
+    return MEDIA_QUANT_TIERS.map(t => {
+      const bpp = BYTES_PER_PARAM[t.id];
+      // VAE stays bf16 (tiny; quantising it costs quality, not memory) — same rule as computeMedia.
+      const weightsGB = model.backbone_params_b * bpp +
+        (model.text_encoder_params_b || 0) * bpp + (model.vae_params_b || 0) * 2;
+      const totalGB = weightsGB + activationGB;
+      return { id: t.id, label: t.label, weightsGB, totalGB, usable: gpu.vram_gb,
+        fits: totalGB <= gpu.vram_gb, gpusNeeded: Math.max(1, Math.ceil(totalGB / gpu.vram_gb)) };
+    });
+  }
+
+  // Speech: the fp16 row is anchored to measured resident VRAM when we have it; other tiers move
+  // only the weights term while the measured non-weights overhead (CUDA context, audio front-end)
+  // is held constant — quantising weights does not shrink that.
+  function speechQuantLadder(model, gpu) {
+    const p = model.params_b || 0;
+    const overhead = model.measured && model.measured.vram_gb
+      ? Math.max(SPEECH_OVERHEAD_GB, model.measured.vram_gb - p * 2)
+      : SPEECH_OVERHEAD_GB;
+    return MEDIA_QUANT_TIERS.map(t => {
+      const weightsGB = p * BYTES_PER_PARAM[t.id];
+      const totalGB = weightsGB + overhead;
+      return { id: t.id, label: t.label, weightsGB, totalGB, usable: gpu.vram_gb,
+        fits: totalGB <= gpu.vram_gb, gpusNeeded: Math.max(1, Math.ceil(totalGB / gpu.vram_gb)) };
+    });
+  }
+
   // ---- Speech: STT / TTS ----------------------------------------------------
   //
   // A third set of physics. The unit of work is a SECOND OF AUDIO, so the headline number is the
@@ -862,6 +912,7 @@
   const api = { compute, BYTES_PER_PARAM, KV_BYTES, MBU, BATCH_EFF,
     computeMedia, mediaLatentTokens, mediaFlops, mediaSeconds, mediaTflops, mediaAnchor,
     computeSpeech, speechRealtime, placement, SPEECH_OVERHEAD_GB,
+    MEDIA_QUANT_TIERS, mediaQuantLadder, speechQuantLadder,
     MEDIA_MFU, MEDIA_ACT_BASE_GB, MEDIA_ACT_BUFFERS,
     engineVersionHistory, toolCallingConfig, toolFlagsFor,
     normalizeHfRef, vllmVerdict, buildServingSpec, servedName, vllmQuantFlag, detectQuantMethod,

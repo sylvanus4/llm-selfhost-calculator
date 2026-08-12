@@ -1,6 +1,6 @@
 {
   "_note": "Open-weight SPEECH models — STT (speech recognition) and TTS (speech synthesis). Distinct from data/speech.json, which is a static reference table of prices and rough VRAM; this file is the calculator dataset. Sizes marked source 'registry' were derived from the ACTUAL staged weights in ThakiCloud's s3://ai-platform/global/models registry (shard bytes / on-disk dtype); sizes marked 'card' come from the published model card. Speech has its own physics again: the unit of work is a SECOND OF AUDIO, not a token or a denoising step, so the headline number is the real-time factor (RTF) — how many seconds of audio you process per second of wall clock. Unlike diffusion, concurrency DOES help here (measured: Granite Speech 37.9x realtime at concurrency 1, 124x at concurrency 8 through vLLM), because these are ordinary transformer forward passes that batch well. `measured` rows are OUR OWN single-B200 runs; ASR accuracy is LibriSpeech clean-validation (64 utterances, 304s). Models we could not run are recorded as blocked with the reason, because 'no runtime exists' is the single most useful fact about a speech model and it is never on the model card.",
-  "_updated": "2026-08-10",
+  "_updated": "2026-08-12",
   "_measured_basis": "Single NVIDIA B200. ASR served through vLLM /v1/audio/transcriptions; TTS through each model's own Python package. Warm-up excluded from timing. Source: media-workspace measurement ledger, docs/measurements/2026-08-10-b200-bench-ledger.md.",
   "models": [
     {
@@ -16,8 +16,34 @@
       "params_source": "registry",
       "disk_gb": 4.64,
       "arch": "GraniteSpeechForConditionalGeneration",
-      "measured": { "gpu": "b200", "engine": "vllm", "realtime_x": 37.9, "concurrency": 1, "realtime_x_batched": 124, "batched_concurrency": 8, "wer_pct": 0.82, "wer_pct_batched": 0.37 },
-      "note": "실측한 STT 중 정확도와 속도 모두 1위입니다(WER 0.82%, 동시성 8에서 0.37%). 이름은 1B이지만 음성 인코더까지 합쳐 실제 2.32B이고 bf16 상주 약 5GB라 어떤 최신 GPU에도 여유롭게 들어갑니다. vLLM이 네이티브로 서빙하고, 동시성을 1에서 8로 올리면 실시간 대비 37.9배에서 124배로 뜁니다 — 디퓨전과 달리 음성은 배칭이 실제로 듣습니다."
+      "measured": {
+        "gpu": "b200",
+        "engine": "vllm",
+        "realtime_x": 37.9,
+        "concurrency": 1,
+        "realtime_x_batched": 124,
+        "batched_concurrency": 8,
+        "wer_pct": 0.82,
+        "wer_pct_batched": 0.37
+      },
+      "note": "실측한 STT 중 정확도와 속도 모두 1위입니다(WER 0.82%, 동시성 8에서 0.37%). 이름은 1B이지만 음성 인코더까지 합쳐 실제 2.32B이고 bf16 상주 약 5GB라 어떤 최신 GPU에도 여유롭게 들어갑니다. vLLM이 네이티브로 서빙하고, 동시성을 1에서 8로 올리면 실시간 대비 37.9배에서 124배로 뜁니다 — 디퓨전과 달리 음성은 배칭이 실제로 듣습니다.",
+      "tuning": [
+        {
+          "param": "attn_implementation",
+          "value": "flash_attention_2",
+          "range": "eager|sdpa|fa2",
+          "note": "카드가 추론에 FA2를 요구합니다(transformers>=5.5.3, torch>=2.9.1).",
+          "source": "https://huggingface.co/ibm-granite/granite-4.0-1b-speech"
+        },
+        {
+          "param": "keyword_list",
+          "value": "도메인 용어·약어 목록",
+          "range": "자유 텍스트",
+          "note": "키워드 바이어싱이 희귀 고유명사·약어 인식률을 올립니다.",
+          "source": "https://huggingface.co/blog/ibm-granite/granite-4-speech"
+        }
+      ],
+      "quants": []
     },
     {
       "id": "qwen3-asr-1.7b",
@@ -32,8 +58,49 @@
       "params_source": "registry",
       "disk_gb": 4.09,
       "arch": "Qwen3ASRForConditionalGeneration",
-      "measured": { "gpu": "b200", "engine": "vllm", "realtime_x": 17.7, "concurrency": 1, "realtime_x_batched": 68.7, "batched_concurrency": 8, "wer_pct": 1.24, "wer_pct_batched": 1.11 },
-      "note": "52개 언어를 지원하는 다국어 STT로, 한국어를 포함한 비영어 작업의 기본 선택지입니다. 영어 LibriSpeech에서는 Granite보다 느리고(17.7배 대 37.9배) WER도 높지만(1.24% 대 0.82%) 언어 커버리지가 훨씬 넓습니다. ⚠️ 순수 transformers로는 굴러가지 않습니다 — 프로세서가 text 인자를 필수로 요구하는 멀티모달 챗 인터페이스라 오디오 함수처럼 호출할 수 없고, 반드시 `-hf` 빌드 + transformers 5.14 이상이 필요합니다. 실서빙 경로는 vLLM입니다."
+      "measured": {
+        "gpu": "b200",
+        "engine": "vllm",
+        "realtime_x": 17.7,
+        "concurrency": 1,
+        "realtime_x_batched": 68.7,
+        "batched_concurrency": 8,
+        "wer_pct": 1.24,
+        "wer_pct_batched": 1.11
+      },
+      "note": "52개 언어를 지원하는 다국어 STT로, 한국어를 포함한 비영어 작업의 기본 선택지입니다. 영어 LibriSpeech에서는 Granite보다 느리고(17.7배 대 37.9배) WER도 높지만(1.24% 대 0.82%) 언어 커버리지가 훨씬 넓습니다. ⚠️ 순수 transformers로는 굴러가지 않습니다 — 프로세서가 text 인자를 필수로 요구하는 멀티모달 챗 인터페이스라 오디오 함수처럼 호출할 수 없고, 반드시 `-hf` 빌드 + transformers 5.14 이상이 필요합니다. 실서빙 경로는 vLLM입니다.",
+      "tuning": [
+        {
+          "param": "max_new_tokens",
+          "value": "256",
+          "range": "64-2048",
+          "note": "기본값은 긴 오디오에서 전사를 자릅니다 — 길면 올리세요.",
+          "source": "https://huggingface.co/Qwen/Qwen3-ASR-1.7B"
+        },
+        {
+          "param": "max_inference_batch_size",
+          "value": "32",
+          "range": "1-128",
+          "note": "처리량이 필요하면 올립니다. 동시성이 실시간 배수를 크게 늘립니다.",
+          "source": "https://huggingface.co/Qwen/Qwen3-ASR-1.7B"
+        },
+        {
+          "param": "language",
+          "value": "auto",
+          "range": "auto | 52개 언어",
+          "note": "내장 언어감지가 있고 스트리밍·오프라인이 단일 모델입니다.",
+          "source": "https://huggingface.co/Qwen/Qwen3-ASR-1.7B"
+        }
+      ],
+      "quants": [
+        {
+          "fmt": "int8",
+          "hf": "vrfai/Qwen3-ASR-1.7B-int8",
+          "official": false,
+          "runtime": "TensorRT-Edge-LLM (Jetson)",
+          "note": "SmoothQuant, Jetson Orin target"
+        }
+      ]
     },
     {
       "id": "qwen3-asr-0.6b",
@@ -49,7 +116,25 @@
       "disk_gb": 1.58,
       "arch": "Qwen3ASRForConditionalGeneration",
       "measured_from": "qwen3-asr-1.7b",
-      "note": "1.7B와 같은 아키텍처의 소형 버전으로 bf16 상주 약 2GB입니다. 엣지나 다중 인스턴스 배치에 적합합니다. 자체 측정은 1.7B만 했으므로 속도는 같은 계열에서 파라미터 비율로 환산한 값이고, 정확도는 상위 모델보다 낮을 것으로 보아야 합니다(미측정)."
+      "note": "1.7B와 같은 아키텍처의 소형 버전으로 bf16 상주 약 2GB입니다. 엣지나 다중 인스턴스 배치에 적합합니다. 자체 측정은 1.7B만 했으므로 속도는 같은 계열에서 파라미터 비율로 환산한 값이고, 정확도는 상위 모델보다 낮을 것으로 보아야 합니다(미측정).",
+      "tuning": [
+        {
+          "param": "max_new_tokens / batch",
+          "value": "256 / 32",
+          "range": "1.7B와 동일",
+          "note": "프로세서 기본값을 공유합니다.",
+          "source": "https://huggingface.co/Qwen/Qwen3-ASR-0.6B"
+        }
+      ],
+      "quants": [
+        {
+          "fmt": "gguf",
+          "hf": "cstr/qwen3-asr-0.6b-GGUF",
+          "official": false,
+          "runtime": "qwen3-asr.cpp (GGML)",
+          "note": "community GGML port"
+        }
+      ]
     },
     {
       "id": "cohere-transcribe-03-2026",
@@ -64,7 +149,32 @@
       "params_source": "registry",
       "disk_gb": 4.13,
       "arch": "CohereAsrForConditionalGeneration",
-      "note": "vLLM 레지스트리에 등재된 ASR이라 서빙 경로는 열려 있습니다. ⚠️ gated 저장소라 인제스트 시 19개 파일 중 18개가 403으로 실패했는데도 워커는 성공으로 끝났고, 빈 prefix를 가리키는 카탈로그 행이 만들어진 적이 있습니다 — 라이선스 동의는 토큰을 소유한 계정에 붙으므로 실제 파일에 HEAD를 던져 확인해야 합니다. 자체 속도·정확도 측정치는 없습니다."
+      "note": "vLLM 레지스트리에 등재된 ASR이라 서빙 경로는 열려 있습니다. ⚠️ gated 저장소라 인제스트 시 19개 파일 중 18개가 403으로 실패했는데도 워커는 성공으로 끝났고, 빈 prefix를 가리키는 카탈로그 행이 만들어진 적이 있습니다 — 라이선스 동의는 토큰을 소유한 계정에 붙으므로 실제 파일에 HEAD를 던져 확인해야 합니다. 자체 속도·정확도 측정치는 없습니다.",
+      "tuning": [
+        {
+          "param": "sampling_rate",
+          "value": "16000",
+          "range": "고정",
+          "note": "model.transcribe() 입력 스펙입니다. 긴 오디오는 자동 청킹됩니다.",
+          "source": "https://huggingface.co/CohereLabs/cohere-transcribe-03-2026"
+        },
+        {
+          "param": "compile / pipeline_detokenization",
+          "value": "True / True",
+          "range": "bool",
+          "note": "인코더 torch.compile + CPU 디토크나이즈 오버랩으로 처리량을 올립니다.",
+          "source": "https://huggingface.co/CohereLabs/cohere-transcribe-03-2026"
+        }
+      ],
+      "quants": [
+        {
+          "fmt": "gguf",
+          "hf": "cstr/cohere-transcribe-03-2026-GGUF",
+          "official": false,
+          "runtime": "llama.cpp family",
+          "note": "community conversion"
+        }
+      ]
     },
     {
       "id": "whisper-large-v3",
@@ -78,7 +188,46 @@
       "params_b": 1.55,
       "params_source": "card",
       "arch": "WhisperForConditionalGeneration",
-      "note": "100개 이상 언어를 다루는 인코더-디코더 STT의 사실상 정확도 기준선입니다. 이 목록에서 가장 오래됐지만 여전히 가장 널리 배포돼 있고, vLLM·TensorRT-LLM·transformers 어디서나 도는 유일한 모델이라 서빙 경로 선택지가 가장 넓습니다. ThakiCloud 레지스트리에는 스테이징돼 있지 않아 자체 측정치가 없습니다."
+      "note": "100개 이상 언어를 다루는 인코더-디코더 STT의 사실상 정확도 기준선입니다. 이 목록에서 가장 오래됐지만 여전히 가장 널리 배포돼 있고, vLLM·TensorRT-LLM·transformers 어디서나 도는 유일한 모델이라 서빙 경로 선택지가 가장 넓습니다. ThakiCloud 레지스트리에는 스테이징돼 있지 않아 자체 측정치가 없습니다.",
+      "tuning": [
+        {
+          "param": "num_beams",
+          "value": "1 + temperature fallback",
+          "range": "1-5",
+          "note": "그리디 + 온도 폴백(0→1.0)이 카드 기본입니다. 저신뢰 구간만 재디코딩합니다.",
+          "source": "https://huggingface.co/openai/whisper-large-v3"
+        },
+        {
+          "param": "condition_on_prev_tokens",
+          "value": "False",
+          "range": "bool",
+          "note": "청크 간 환각 루프를 막습니다.",
+          "source": "https://huggingface.co/openai/whisper-large-v3"
+        },
+        {
+          "param": "chunk / max_new_tokens",
+          "value": "30s / ≤448",
+          "range": "고정",
+          "note": "30초가 네이티브 학습 창이고 448이 디코더 상한입니다.",
+          "source": "https://huggingface.co/openai/whisper-large-v3"
+        }
+      ],
+      "quants": [
+        {
+          "fmt": "ct2-int8",
+          "hf": "Systran/faster-whisper-large-v3",
+          "official": true,
+          "runtime": "faster-whisper (CTranslate2)",
+          "note": "upstream maintainer conversion"
+        },
+        {
+          "fmt": "gguf",
+          "hf": "ggerganov/whisper.cpp",
+          "official": false,
+          "runtime": "whisper.cpp",
+          "note": "q5/q8 GGML ports"
+        }
+      ]
     },
     {
       "id": "whisper-large-v3-turbo",
@@ -92,7 +241,32 @@
       "params_b": 0.809,
       "params_source": "card",
       "arch": "WhisperForConditionalGeneration",
-      "note": "large-v3에서 디코더 층을 32개에서 4개로 줄여 훨씬 빠르면서 정확도 손실은 작은 버전입니다. 실시간 전사에서 가장 흔한 기본값이며 bf16 상주 2GB 미만이라 소형 카드에도 들어갑니다. 자체 측정치는 없습니다."
+      "note": "large-v3에서 디코더 층을 32개에서 4개로 줄여 훨씬 빠르면서 정확도 손실은 작은 버전입니다. 실시간 전사에서 가장 흔한 기본값이며 bf16 상주 2GB 미만이라 소형 카드에도 들어갑니다. 자체 측정치는 없습니다.",
+      "tuning": [
+        {
+          "param": "decoding",
+          "value": "large-v3와 동일",
+          "range": "-",
+          "note": "생성 설정을 공유하고, 4레이어 디코더로 2-3배 빠릅니다.",
+          "source": "https://huggingface.co/openai/whisper-large-v3-turbo"
+        }
+      ],
+      "quants": [
+        {
+          "fmt": "ct2-int8",
+          "hf": "deepdml/faster-whisper-large-v3-turbo-ct2",
+          "official": false,
+          "runtime": "faster-whisper (CTranslate2)",
+          "note": "ct2 int8/float16 conversion"
+        },
+        {
+          "fmt": "gguf",
+          "hf": "ggerganov/whisper.cpp",
+          "official": false,
+          "runtime": "whisper.cpp",
+          "note": "large-v3-turbo q5_0 547MB / q8_0"
+        }
+      ]
     },
     {
       "id": "nemotron-3.5-asr-streaming-0.6b",
@@ -107,11 +281,24 @@
       "params_source": "registry",
       "disk_gb": 5.66,
       "arch": "Nemotron3_5AsrForRNNT",
-      "blocked": {
-        "kind": "runtime",
-        "reason": "스트리밍 전용 체크포인트라 배치 전사로는 측정할 수 없습니다. 언어 프롬프트가 set_inference_prompt(PromptStreamingMixin) 경로로만 전달되고 오프라인 transcribe()는 그 값을 아예 읽지 않아, 6라운드에 걸쳐 인자를 바꿔 넣어도 전부 무시됐습니다. vLLM은 RNN-T를 서빙하지 못하고 nemo_toolkit[asr] 격리 venv가 필요합니다. 실시간 스트리밍 하네스를 따로 짜야 사용할 수 있습니다."
-      },
-      "note": "RNN-T 스트리밍 ASR입니다. 디스크 5.66GB가 큰 이유는 fp32로 배포되기 때문이고, 실제 파라미터는 1.42B입니다. ⚠️ 라이선스가 HF 메타데이터에는 other로 표기돼 있어 상업 이용 전 원문 확인이 필요합니다."
+      "note": "RNN-T 스트리밍 ASR입니다. 오프라인 transcribe()가 언어 프롬프트를 읽지 않는 것은 NVIDIA 이슈 트래커에서도 확인된 미해결 버그라 배치 전사로는 쓸 수 없고, NeMo의 cache-aware 스트리밍 스크립트(att_context_size로 지연 제어) 또는 NIM 컨테이너(nemotron-asr-streaming)로 서빙합니다. 모델 카드 기준 H100 1장에서 80ms 청크 약 240 동시 스트림, 1120ms 청크 약 2,400 스트림입니다. 디스크 5.66GB가 큰 이유는 fp32로 배포되기 때문이고, 실제 파라미터는 1.42B입니다. ⚠️ 라이선스가 HF 메타데이터에는 other로 표기돼 있어 상업 이용 전 원문 확인이 필요합니다.",
+      "tuning": [
+        {
+          "param": "att_context_size",
+          "value": "[56,3]",
+          "range": "[56,0]-[56,13]",
+          "note": "룩어헤드로 지연·정확도를 거래합니다 — [56,0]은 80ms 초저지연, [56,13]은 1.12s 최고 정확도.",
+          "source": "https://huggingface.co/nvidia/nemotron-3.5-asr-streaming-0.6b"
+        },
+        {
+          "param": "chunk",
+          "value": "160ms 또는 560ms",
+          "range": "80/160/560/1120ms",
+          "note": "청크가 클수록 처리량이 오르고(동시 스트림 240→2,400) 지연이 늘어납니다.",
+          "source": "https://huggingface.co/nvidia/nemotron-3.5-asr-streaming-0.6b"
+        }
+      ],
+      "quants": []
     },
     {
       "id": "voxcpm1.5",
@@ -126,8 +313,40 @@
       "params_source": "registry",
       "disk_gb": 1.95,
       "runtime_pkg": "voxcpm",
-      "measured": { "gpu": "b200", "engine": "voxcpm", "rtf": 0.028, "realtime_x": 36, "concurrency": 1, "compile_speedup": 1.27 },
-      "note": "실측한 TTS 중 압도적으로 빠릅니다 — RTF 0.028, 즉 실시간의 36배로 합성합니다. 1분짜리 음성을 1.7초에 만듭니다. bf16 상주 2GB로 가볍고 스톡 이미지에서 그대로 돌아가는 유일한 TTS이기도 합니다. torch.compile로 1.27배 더 빨라집니다. ⚠️ 초판 측정에서 웜업을 빼지 않아 RTF를 4.49(실시간 0.2배)로 잘못 보고했다가 0.028로 정정한 이력이 있습니다 — 160배 오차였습니다."
+      "measured": {
+        "gpu": "b200",
+        "engine": "voxcpm",
+        "rtf": 0.028,
+        "realtime_x": 36,
+        "concurrency": 1,
+        "compile_speedup": 1.27
+      },
+      "note": "실측한 TTS 중 압도적으로 빠릅니다 — RTF 0.028, 즉 실시간의 36배로 합성합니다. 1분짜리 음성을 1.7초에 만듭니다. bf16 상주 2GB로 가볍고 스톡 이미지에서 그대로 돌아가는 유일한 TTS이기도 합니다. torch.compile로 1.27배 더 빨라집니다. ⚠️ 초판 측정에서 웜업을 빼지 않아 RTF를 4.49(실시간 0.2배)로 잘못 보고했다가 0.028로 정정한 이력이 있습니다 — 160배 오차였습니다.",
+      "tuning": [
+        {
+          "param": "prompt_wav",
+          "value": "3-5s 깨끗한 참조 클립",
+          "range": "-",
+          "note": "제로샷 클로닝이 음색·억양·운율을 그대로 가져갑니다.",
+          "source": "https://github.com/OpenBMB/VoxCPM"
+        },
+        {
+          "param": "cfg_value / inference_timesteps",
+          "value": "기본값(≈2.0) / 기본",
+          "range": "1-3 / 낮출수록 빠름",
+          "note": "CFG는 유도 강도-자연스러움, 타임스텝은 품질-속도 트레이드오프입니다.",
+          "source": "https://huggingface.co/openbmb/VoxCPM1.5"
+        }
+      ],
+      "quants": [
+        {
+          "fmt": "gguf",
+          "hf": "bluryar/VoxCPM-GGUF",
+          "official": false,
+          "runtime": "community",
+          "note": "unverified runtime support"
+        }
+      ]
     },
     {
       "id": "chatterbox",
@@ -142,8 +361,40 @@
       "params_source": "card",
       "disk_gb": 13.87,
       "runtime_pkg": "chatterbox-tts",
-      "measured": { "gpu": "b200", "engine": "chatterbox-tts", "rtf": 1.277, "realtime_x": 0.78, "concurrency": 1, "vram_gb": 3.1 },
-      "note": "23개 이상 언어와 감정 제어, zero-shot 클로닝을 지원하지만 ⚠️ 실시간에 못 미칩니다(RTF 1.277 = 실시간의 0.78배). 1분 음성을 만드는 데 77초가 걸립니다. 이 목록에서 가장 작은 축인데 가장 느리다는 점이 중요합니다 — 작은 모델을 고르는 것과 실시간 합성을 얻는 것은 별개입니다. 의존성이 torch 2.6을 핀하고 transformers 5.x에서 LlamaModel import가 깨져 격리 venv가 필수입니다."
+      "measured": {
+        "gpu": "b200",
+        "engine": "chatterbox-tts",
+        "rtf": 1.277,
+        "realtime_x": 0.78,
+        "concurrency": 1,
+        "vram_gb": 3.1
+      },
+      "note": "23개 이상 언어와 감정 제어, zero-shot 클로닝을 지원하지만 ⚠️ 실시간에 못 미칩니다(RTF 1.277 = 실시간의 0.78배). 1분 음성을 만드는 데 77초가 걸립니다. 이 목록에서 가장 작은 축인데 가장 느리다는 점이 중요합니다 — 작은 모델을 고르는 것과 실시간 합성을 얻는 것은 별개입니다. 의존성이 torch 2.6을 핀하고 transformers 5.x에서 LlamaModel import가 깨져 격리 venv가 필수입니다.",
+      "tuning": [
+        {
+          "param": "exaggeration",
+          "value": "0.5",
+          "range": "0.0-1.0+",
+          "note": "감정 강도입니다. 0.7 이상은 표현이 커지고 말도 빨라집니다.",
+          "source": "https://github.com/resemble-ai/chatterbox"
+        },
+        {
+          "param": "cfg_weight",
+          "value": "0.5",
+          "range": "0.0-1.0",
+          "note": "참조 음성 충실도입니다. 드라마틱한 낭독은 0.3 근처가 권장입니다.",
+          "source": "https://github.com/resemble-ai/chatterbox"
+        }
+      ],
+      "quants": [
+        {
+          "fmt": "onnx-q4",
+          "hf": "ResembleAI/chatterbox-turbo-ONNX",
+          "official": true,
+          "runtime": "ONNX Runtime",
+          "note": "turbo variant; drops exaggeration/cfg controls"
+        }
+      ]
     },
     {
       "id": "kokoro-82m",
@@ -157,7 +408,32 @@
       "params_b": 0.082,
       "params_source": "card",
       "runtime_pkg": "kokoro",
-      "note": "82M짜리 초경량 TTS로 엣지·CPU 배포에서 가장 인기 있는 선택지입니다. 상주 메모리가 1GB 미만이라 GPU 없이도 실용적입니다. ThakiCloud 레지스트리에 스테이징돼 있지 않아 자체 측정치는 없고, 속도는 파라미터 기반 추정입니다."
+      "note": "82M짜리 초경량 TTS로 엣지·CPU 배포에서 가장 인기 있는 선택지입니다. 상주 메모리가 1GB 미만이라 GPU 없이도 실용적입니다. ThakiCloud 레지스트리에 스테이징돼 있지 않아 자체 측정치는 없고, 속도는 파라미터 기반 추정입니다.",
+      "tuning": [
+        {
+          "param": "voice",
+          "value": "af_heart 등 보이스 팩",
+          "range": "VOICES.md 참조",
+          "note": "보이스 팩이 음색과 언어를 결정합니다.",
+          "source": "https://huggingface.co/hexgrad/Kokoro-82M"
+        },
+        {
+          "param": "speed / split_pattern",
+          "value": "1.0 / r'\\n+'",
+          "range": "0.5-2.0",
+          "note": "장문은 speed 0.9와 정규식 청킹이 말 빨라짐을 막아줍니다.",
+          "source": "https://huggingface.co/hexgrad/Kokoro-82M"
+        }
+      ],
+      "quants": [
+        {
+          "fmt": "onnx-int8",
+          "hf": "onnx-community/Kokoro-82M-v1.0-ONNX",
+          "official": false,
+          "runtime": "ONNX Runtime / kokoro-onnx",
+          "note": "fp32+quantized ONNX weights"
+        }
+      ]
     },
     {
       "id": "fun-cosyvoice3-0.5b",
@@ -172,11 +448,46 @@
       "params_source": "card",
       "disk_gb": 9.75,
       "runtime_pkg": "cosyvoice",
-      "blocked": {
-        "kind": "runtime",
-        "reason": "현재 스택에서 합성이 되지 않습니다(9라운드 확인). zero-shot 전용인데 list_available_spks()가 빈 배열이라 사전 화자 모드를 못 쓰고, 벤더 참조 클립과 벤더 헬퍼까지 그대로 써도 torchcodec에서 깨집니다(video_tensor must be kUInt8 — 코덱은 인코딩된 바이트를 원하는데 모델은 float 텐서를 넘김). 호출 규약 문제가 아니라 torch 2.3 시절 코드가 2.11 오디오 API에서 깨지는 세대 불일치이므로, 벤더 세대에 맞춘 별도 이미지가 필요합니다."
-      },
-      "note": "다국어 zero-shot TTS입니다. 의존성이 torch 2.3.1과 numpy 1.26.4를 핀해서 그대로 설치하면 컨테이너의 torch 2.11(cu130)을 두 세대 되돌리고 CUDA를 잃습니다."
+      "note": "다국어 zero-shot TTS입니다. 로컬 cosyvoice 패키지는 torch 2.3 세대 코드가 최신 오디오 API(torchcodec)에서 깨져 벤더 핀(torch 2.3.1·numpy 1.26.4) 격리 환경이 필요합니다. 사전 화자 목록이 비어 있는 것은 결함이 아니라 zero-shot 전용 설계입니다(참조 음성 필수). vLLM-Omni가 정확히 이 체크포인트를 구현·등재하고 있어 벤더 스택을 우회하는 서빙 경로가 있습니다.",
+      "tuning": [
+        {
+          "param": "mode",
+          "value": "cross-lingual",
+          "range": "cross-lingual|zero-shot|instruct|vc",
+          "note": "instruct 모드는 자연어 지시문으로 스타일을 제어합니다.",
+          "source": "https://huggingface.co/FunAudioLLM/Fun-CosyVoice3-0.5B-2512"
+        },
+        {
+          "param": "instruct_text",
+          "value": "'천천히 차분하게' 류 지시문",
+          "range": "자유 텍스트",
+          "note": "운율·감정을 지시문으로 조절합니다.",
+          "source": "https://huggingface.co/FunAudioLLM/Fun-CosyVoice3-0.5B-2512"
+        },
+        {
+          "param": "streaming",
+          "value": "저지연이 필요하면 켬",
+          "range": "bool",
+          "note": "실용 스트리밍 지연은 약 150ms입니다.",
+          "source": "https://huggingface.co/FunAudioLLM/Fun-CosyVoice3-0.5B-2512"
+        }
+      ],
+      "quants": [
+        {
+          "fmt": "mlx-8bit",
+          "hf": "mlx-community/Fun-CosyVoice3-0.5B-2512-8bit",
+          "official": false,
+          "runtime": "MLX (Apple Silicon)",
+          "note": "community conversion"
+        },
+        {
+          "fmt": "mlx-4bit",
+          "hf": "mlx-community/Fun-CosyVoice3-0.5B-2512-4bit",
+          "official": false,
+          "runtime": "MLX (Apple Silicon)",
+          "note": "community conversion"
+        }
+      ]
     },
     {
       "id": "qwen3-tts-12hz-1.7b",
@@ -191,11 +502,54 @@
       "params_source": "registry",
       "disk_gb": 4.54,
       "arch": "Qwen3TTSForConditionalGeneration",
-      "blocked": {
-        "kind": "runtime",
-        "reason": "서빙 런타임이 없습니다. transformers에 qwen3_tts 모델 타입이 없고 vLLM도 오디오 출력 모델을 서빙하지 못합니다. 전용 패키지도 공개되지 않아 현재로서는 로드 경로 자체가 없습니다."
-      },
-      "note": "10개 언어와 3초 클로닝, 보이스 디자인을 내세운 TTS입니다. ⚠️ Base 체크포인트는 generate_custom_voice를 거부하고 generate_voice_clone(ref_audio, ref_text) 경로만 받으므로 참조 음성이 반드시 필요합니다. 파라미터 2.27B는 speech_tokenizer 0.68GB를 포함한 스테이징 가중치 기준입니다."
+      "note": "10개 언어와 3초 클로닝, 보이스 디자인을 내세운 TTS입니다. 공식 파이썬 패키지 qwen-tts(PyPI 0.1.1, transformers 4.57.3 핀)가 로드 경로이고, vLLM-Omni도 Base·CustomVoice·VoiceDesign 체크포인트를 day-0로 등재해 서빙 경로가 둘 다 열려 있습니다. ⚠️ Base 체크포인트는 generate_custom_voice를 거부하고 generate_voice_clone(ref_audio, ref_text) 경로만 받으므로 참조 음성이 반드시 필요합니다. 파라미터 2.27B는 speech_tokenizer 0.68GB를 포함한 스테이징 가중치 기준입니다.",
+      "runtime_pkg": "qwen-tts",
+      "tuning": [
+        {
+          "param": "ref_audio (Base)",
+          "value": "3초 깨끗한 클립",
+          "range": "-",
+          "note": "Base는 제로샷 클로닝 전용이라 참조 음성이 필수입니다.",
+          "source": "https://huggingface.co/Qwen/Qwen3-TTS-12Hz-1.7B-Base"
+        },
+        {
+          "param": "speaker (CustomVoice)",
+          "value": "9개 프리셋 중 텍스트 언어와 맞는 화자",
+          "range": "9 고정",
+          "note": "텍스트 언어의 네이티브 화자를 고르는 것이 카드 권장입니다.",
+          "source": "https://huggingface.co/Qwen/Qwen3-TTS-12Hz-1.7B-CustomVoice"
+        },
+        {
+          "param": "instruct",
+          "value": "스타일 프롬프트(선택)",
+          "range": "자유 텍스트",
+          "note": "generate_custom_voice에 스타일 지시를 넘길 수 있습니다.",
+          "source": "https://huggingface.co/Qwen/Qwen3-TTS-12Hz-1.7B-CustomVoice"
+        }
+      ],
+      "quants": [
+        {
+          "fmt": "mlx-8bit",
+          "hf": "mlx-community/Qwen3-TTS-12Hz-1.7B-CustomVoice-8bit",
+          "official": false,
+          "runtime": "MLX (Apple Silicon)",
+          "note": "community conversion"
+        },
+        {
+          "fmt": "mlx-4bit",
+          "hf": "mlx-community/Qwen3-TTS-12Hz-1.7B-CustomVoice-4bit",
+          "official": false,
+          "runtime": "MLX (Apple Silicon)",
+          "note": "community conversion"
+        },
+        {
+          "fmt": "gguf",
+          "hf": "cstr/qwen3-tts-1.7b-customvoice-GGUF",
+          "official": false,
+          "runtime": "llama.cpp family",
+          "note": "community conversion"
+        }
+      ]
     }
   ]
 }

@@ -190,6 +190,11 @@
           <div id="mediaCostBox"></div>
         </div>
 
+        <div class="block" id="mediaTuningBlock" hidden>
+          <div class="block-title" data-i18n="media.tuning">파라미터 튜닝 가이드</div>
+          <div class="nums" id="mediaTuning"></div>
+        </div>
+
         <div class="block">
           <div class="block-title" data-i18n="media.howtitle">이 숫자를 어떻게 계산했나</div>
           <div class="nums" id="mediaMethod"></div>
@@ -220,6 +225,12 @@
         <div class="block-title"><span data-i18n="mplace.nodemem">GPU별 메모리</span> <span class="dim" id="mplaceCardsHint"></span></div>
         <div class="node-cards" id="mplaceNodeCards"></div>
         <div class="legend node-legend" id="mplaceLegend"></div>
+      </div>
+
+      <div class="block">
+        <div class="block-title"><span data-i18n="mplace.qladder">양자화 사다리</span> <span class="dim" data-i18n="mplace.qladderhint">— 막대 = usable 대비 · 초록 fit · 빨강 초과</span></div>
+        <div class="ladder" id="mplaceQuantLadder"></div>
+        <div class="nums" id="mplaceQuantCkpts"></div>
       </div>
 
       <div class="block">

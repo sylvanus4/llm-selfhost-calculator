@@ -106,6 +106,12 @@
       "mplace.throughput": "합계 처리량 <b>{v}</b> {unit}",
       "mplace.nothroughput": "속도를 산출하지 못해 합계 처리량을 낼 수 없습니다.",
       "mplace.ladder": "GPU 수별 처리량",
+      "mplace.qladder": "양자화 사다리",
+      "mplace.qladderhint": "— 막대 = usable 대비 · 초록 fit · 빨강 초과",
+      "mplace.qckpts": "공개 양자화 체크포인트",
+      "mplace.qarith": "막대는 산술 what-if입니다 — 양자화는 VRAM만 줄이고 속도는 그대로입니다(실측: fp8 단독은 오히려 느렸음). ✓ = 공개 체크포인트가 있는 티어.",
+      "media.tuning": "파라미터 튜닝 가이드",
+      "tune.official": "공식",
       "mplace.whytitle": "왜 샤딩이 아니라 복제인가",
       "mplace.why.media1": "LLM 탭은 모델 하나를 여러 장에 <b>쪼개는</b> 문제를 풉니다. 디퓨전은 대개 한 장에 들어가므로 반대 질문이 됩니다 — 몇 개를 <b>복제</b>할 것인가.",
       "mplace.why.media2": "실측에서 배치를 키우면 6~10%만 빨라지는데 VRAM은 1.5배가 됩니다. 반면 GPU를 한 장 더 쓰면 처리량이 그대로 2배가 됩니다. 디퓨전에서는 배칭이 아니라 복제가 정답입니다.",
@@ -437,6 +443,12 @@
       "mplace.throughput": "Aggregate throughput <b>{v}</b> {unit}",
       "mplace.nothroughput": "No latency available, so no aggregate throughput.",
       "mplace.ladder": "Throughput by GPU count",
+      "mplace.qladder": "Quant ladder",
+      "mplace.qladderhint": "— bar = vs usable · green fits · red overflow",
+      "mplace.qckpts": "Published quantized checkpoints",
+      "mplace.qarith": "Bars are an arithmetic what-if — quantisation only moves VRAM, never speed (measured: fp8 alone was slower). ✓ = tier with a published checkpoint.",
+      "media.tuning": "Parameter tuning guide",
+      "tune.official": "official",
       "mplace.whytitle": "Why replicas, not sharding",
       "mplace.why.media1": "The LLM tab solves how to <b>split</b> one model across devices. A diffusion model usually fits on one, so the question inverts — how many <b>replicas</b> do you run.",
       "mplace.why.media2": "Measured, raising the batch buys 6-10% for 1.5x the VRAM. A second GPU buys a clean 2x. For diffusion the answer is replicas, not batching.",
@@ -728,14 +740,8 @@
       "A custom_code model requiring trust_remote_code=True.",
     "TensorRT-LLM에 전용 예제가 있습니다(convert_checkpoint.py → trtllm-build → run.py). 이 목록에서 세 엔진 모두에서 도는 유일한 음성 모델입니다.":
       "TensorRT-LLM ships a dedicated example (convert_checkpoint.py to trtllm-build to run.py). It is the only speech model here that runs on all three engines.",
-    "transformers가 아니라 NeMo 생태계이고 격리 venv가 필요합니다.":
-      "This is the NeMo ecosystem rather than transformers, and it needs an isolated venv.",
-    "언어 프롬프트는 set_inference_prompt(PromptStreamingMixin)로만 전달됩니다 — 오프라인 transcribe()는 그 값을 읽지 않아 배치 전사로는 쓸 수 없습니다.":
-      "The language prompt only reaches the model through set_inference_prompt (PromptStreamingMixin) — offline transcribe() never reads it, so batch transcription is not usable.",
     "RNN-T 아키텍처라 vLLM이 서빙하지 못합니다(inputs_embeds 계약 불일치).":
       "vLLM cannot serve it: the RNN-T architecture does not match the inputs_embeds contract.",
-    "TensorRT-LLM이 최적화할 수 있다는 일반적 마케팅 문구는 있으나 구체적 예제나 체크포인트 변환 경로를 찾지 못했습니다. NVIDIA 자체 안내는 NeMo + Triton을 가리킵니다.":
-      "There is generic marketing copy saying TensorRT-LLM can optimise it, but no concrete example or checkpoint-conversion path was found. NVIDIA's own guidance points to NeMo plus Triton.",
     "전용 패키지 voxcpm으로 스톡 이미지에서 그대로 돕니다 — 이 목록에서 격리 venv가 필요 없는 유일한 TTS입니다.":
       "Runs as-is on the stock image through its own voxcpm package — the only TTS here that needs no isolated venv.",
     "torch.compile로 1.27배 빨라집니다(실측).":
@@ -752,18 +758,8 @@
       "At 82M it is practical even on CPU.",
     "vLLM-Omni 지원 목록에 없습니다.":
       "Not in the vLLM-Omni supported list.",
-    "현재 스택에서 합성이 되지 않습니다 — torch 2.3 시절 코드가 torch 2.11 오디오 API에서 torchcodec 예외로 깨집니다(9라운드 확인).":
-      "Synthesis does not work on the current stack — torch 2.3-era code breaks against the torch 2.11 audio API with a torchcodec exception (confirmed over nine rounds).",
     "funasr가 아니라 cosyvoice 패키지이고, 벤더 저장소를 tarball로 받아야 합니다(잡 이미지에 git이 없음).":
       "The package is cosyvoice, not funasr, and the vendor repo has to be fetched as a tarball (the job image has no git).",
-    "⭐ 로컬 패키지 경로는 막혀 있지만 vLLM-Omni가 정확히 이 체크포인트를 등재하고 있습니다 — 우리 백로그의 'CosyVoice3 실행 불가'를 우회할 후보 경로입니다(미검증).":
-      "The local package path is blocked, but vLLM-Omni lists exactly this checkpoint — a candidate route around our 'CosyVoice3 cannot run' backlog item (unverified).",
-    "CosyVoice의 TensorRT-LLM 런타임 지원을 주장하는 2차 출처가 있으나 공식 문서·예제에서 확인되지 않습니다.":
-      "A secondary source claims TensorRT-LLM runtime support for CosyVoice, but it is not confirmed in official docs or examples.",
-    "transformers에 qwen3_tts 모델 타입이 없고 공개된 전용 패키지도 없어 로드 경로가 없습니다.":
-      "transformers has no qwen3_tts model type and no dedicated package has been published, so there is no load path.",
-    "⭐ vLLM-Omni가 Qwen3-TTS 변형들(Base·CustomVoice·VoiceDesign)을 등재하고 있어 현재 알려진 유일한 서빙 경로입니다(미검증).":
-      "vLLM-Omni lists the Qwen3-TTS variants (Base, CustomVoice, VoiceDesign), making it the only known serving path today (unverified).",
     "메인라인이 아닌 NVIDIA/TensorRT-Edge-LLM에 Qwen3-TTS-12Hz-0.6B/1.7B-CustomVoice가 등재돼 있습니다 — 엣지 대상의 별도 코드베이스입니다.":
       "Qwen3-TTS-12Hz-0.6B/1.7B-CustomVoice appears in NVIDIA/TensorRT-Edge-LLM rather than mainline — a separate, edge-targeted codebase.",
     "diffusers와 transformers 모두 HTTP 서버를 내장하지 않습니다 — 직접 FastAPI 등으로 감싸거나 아래 엔진을 쓰세요.":
@@ -786,24 +782,12 @@
       "The de-facto accuracy baseline for encoder-decoder STT across 100+ languages. It is the oldest model here yet still the most widely deployed, and the only one that runs on transformers, vLLM and TensorRT-LLM alike — so it has the widest choice of serving paths. It is not staged in the ThakiCloud registry, so we have no measurement of our own.",
     "large-v3에서 디코더 층을 32개에서 4개로 줄여 훨씬 빠르면서 정확도 손실은 작은 버전입니다. 실시간 전사에서 가장 흔한 기본값이며 bf16 상주 2GB 미만이라 소형 카드에도 들어갑니다. 자체 측정치는 없습니다.":
       "large-v3 with the decoder cut from 32 layers to 4 — much faster for a small accuracy cost. It is the most common default for realtime transcription and sits under 2GB resident at bf16, so it fits small cards. No measurement of our own.",
-    "RNN-T 스트리밍 ASR입니다. 디스크 5.66GB가 큰 이유는 fp32로 배포되기 때문이고, 실제 파라미터는 1.42B입니다. ⚠️ 라이선스가 HF 메타데이터에는 other로 표기돼 있어 상업 이용 전 원문 확인이 필요합니다.":
-      "An RNN-T streaming ASR. The 5.66GB on disk is large because it ships as fp32; the real parameter count is 1.42B. ⚠️ HF metadata records the licence as 'other', so confirm the original terms before commercial use.",
-    "스트리밍 전용 체크포인트라 배치 전사로는 측정할 수 없습니다. 언어 프롬프트가 set_inference_prompt(PromptStreamingMixin) 경로로만 전달되고 오프라인 transcribe()는 그 값을 아예 읽지 않아, 6라운드에 걸쳐 인자를 바꿔 넣어도 전부 무시됐습니다. vLLM은 RNN-T를 서빙하지 못하고 nemo_toolkit[asr] 격리 venv가 필요합니다. 실시간 스트리밍 하네스를 따로 짜야 사용할 수 있습니다.":
-      "A streaming-only checkpoint, so it cannot be measured by batch transcription. The language prompt reaches it only through set_inference_prompt (PromptStreamingMixin) and offline transcribe() never reads that value — six rounds of changing the argument were all silently ignored. vLLM cannot serve RNN-T, and nemo_toolkit[asr] needs an isolated venv. Using it requires writing a separate realtime streaming harness.",
     "실측한 TTS 중 압도적으로 빠릅니다 — RTF 0.028, 즉 실시간의 36배로 합성합니다. 1분짜리 음성을 1.7초에 만듭니다. bf16 상주 2GB로 가볍고 스톡 이미지에서 그대로 돌아가는 유일한 TTS이기도 합니다. torch.compile로 1.27배 더 빨라집니다. ⚠️ 초판 측정에서 웜업을 빼지 않아 RTF를 4.49(실시간 0.2배)로 잘못 보고했다가 0.028로 정정한 이력이 있습니다 — 160배 오차였습니다.":
       "By far the fastest TTS we measured — RTF 0.028, meaning it synthesises at 36x realtime and produces a minute of speech in 1.7 seconds. It is also light at 2GB resident and the only TTS here that runs on the stock image unmodified. torch.compile adds another 1.27x. ⚠️ Our first measurement failed to exclude warm-up and reported RTF 4.49 (0.2x realtime) before being corrected to 0.028 — a 160x error.",
     "23개 이상 언어와 감정 제어, zero-shot 클로닝을 지원하지만 ⚠️ 실시간에 못 미칩니다(RTF 1.277 = 실시간의 0.78배). 1분 음성을 만드는 데 77초가 걸립니다. 이 목록에서 가장 작은 축인데 가장 느리다는 점이 중요합니다 — 작은 모델을 고르는 것과 실시간 합성을 얻는 것은 별개입니다. 의존성이 torch 2.6을 핀하고 transformers 5.x에서 LlamaModel import가 깨져 격리 venv가 필수입니다.":
       "Supports 23+ languages with emotion control and zero-shot cloning, but ⚠️ it does not reach realtime (RTF 1.277 = 0.78x realtime), taking 77 seconds to produce a minute of speech. The important point is that the smallest model here is also the slowest — picking a small model and getting realtime synthesis are different things. Its dependencies pin torch 2.6 and its LlamaModel import breaks on transformers 5.x, so an isolated venv is mandatory.",
     "82M짜리 초경량 TTS로 엣지·CPU 배포에서 가장 인기 있는 선택지입니다. 상주 메모리가 1GB 미만이라 GPU 없이도 실용적입니다. ThakiCloud 레지스트리에 스테이징돼 있지 않아 자체 측정치는 없고, 속도는 파라미터 기반 추정입니다.":
       "An ultra-light 82M TTS and the most popular choice for edge and CPU deployment, under 1GB resident and practical without a GPU. It is not staged in the ThakiCloud registry, so we have no measurement and the speed is a parameter-based estimate.",
-    "다국어 zero-shot TTS입니다. 의존성이 torch 2.3.1과 numpy 1.26.4를 핀해서 그대로 설치하면 컨테이너의 torch 2.11(cu130)을 두 세대 되돌리고 CUDA를 잃습니다.":
-      "A multilingual zero-shot TTS. Its dependencies pin torch 2.3.1 and numpy 1.26.4, so installing them as declared rolls the container's torch 2.11 (cu130) back two generations and loses CUDA.",
-    "현재 스택에서 합성이 되지 않습니다(9라운드 확인). zero-shot 전용인데 list_available_spks()가 빈 배열이라 사전 화자 모드를 못 쓰고, 벤더 참조 클립과 벤더 헬퍼까지 그대로 써도 torchcodec에서 깨집니다(video_tensor must be kUInt8 — 코덱은 인코딩된 바이트를 원하는데 모델은 float 텐서를 넘김). 호출 규약 문제가 아니라 torch 2.3 시절 코드가 2.11 오디오 API에서 깨지는 세대 불일치이므로, 벤더 세대에 맞춘 별도 이미지가 필요합니다.":
-      "Synthesis does not work on the current stack (confirmed over nine rounds). It is zero-shot only, but list_available_spks() returns an empty array so the preset-speaker mode is unusable, and even with the vendor's own reference clip and helper it breaks inside torchcodec (video_tensor must be kUInt8 — the codec wants encoded bytes while the model passes a float tensor). This is not a calling-convention problem but a generation mismatch between torch 2.3-era code and the torch 2.11 audio API, so it needs a separate image pinned to the vendor's generation.",
-    "10개 언어와 3초 클로닝, 보이스 디자인을 내세운 TTS입니다. ⚠️ Base 체크포인트는 generate_custom_voice를 거부하고 generate_voice_clone(ref_audio, ref_text) 경로만 받으므로 참조 음성이 반드시 필요합니다. 파라미터 2.27B는 speech_tokenizer 0.68GB를 포함한 스테이징 가중치 기준입니다.":
-      "A TTS advertising 10 languages, 3-second cloning and voice design. ⚠️ The Base checkpoint refuses generate_custom_voice and accepts only generate_voice_clone(ref_audio, ref_text), so a reference recording is mandatory. The 2.27B figure covers the staged weights including the 0.68GB speech_tokenizer.",
-    "서빙 런타임이 없습니다. transformers에 qwen3_tts 모델 타입이 없고 vLLM도 오디오 출력 모델을 서빙하지 못합니다. 전용 패키지도 공개되지 않아 현재로서는 로드 경로 자체가 없습니다.":
-      "No serving runtime exists. transformers has no qwen3_tts model type, vLLM cannot serve audio-output models, and no dedicated package has been published — so there is currently no load path at all.",
     // --- data/media-models.json (image + video generation) ---
     "라이선스가 유럽연합·영국·대한민국·미국을 Excluded Territory로 지정하고, 해당 지역에서는 상업 이용뿐 아니라 사용·복제·수정·배포·전시 전부를 금지합니다(제V.4조). 별도 라이선스를 신청하면 승인받을 수 있습니다. ThakiCloud는 이 조항 때문에 스테이징했던 가중치를 삭제했습니다 — 아래 수치는 라이선스가 허용되는 지역에서의 도입 검토용입니다.":
       "The licence names the European Union, the United Kingdom, the Republic of Korea and the United States as Excluded Territories, and in those regions it forbids not just commercial use but use, reproduction, modification, distribution and display outright (Section V.4). A separate licence can be applied for and granted. ThakiCloud deleted its staged weights because of this clause — the figures below are for evaluating deployment where the licence permits it.",
@@ -970,6 +954,150 @@
     "/분": "/min",
     "/시간": "/hr",
     "/1M자": "/1M chars",
+    "RNN-T 스트리밍 ASR입니다. 오프라인 transcribe()가 언어 프롬프트를 읽지 않는 것은 NVIDIA 이슈 트래커에서도 확인된 미해결 버그라 배치 전사로는 쓸 수 없고, NeMo의 cache-aware 스트리밍 스크립트(att_context_size로 지연 제어) 또는 NIM 컨테이너(nemotron-asr-streaming)로 서빙합니다. 모델 카드 기준 H100 1장에서 80ms 청크 약 240 동시 스트림, 1120ms 청크 약 2,400 스트림입니다. 디스크 5.66GB가 큰 이유는 fp32로 배포되기 때문이고, 실제 파라미터는 1.42B입니다. ⚠️ 라이선스가 HF 메타데이터에는 other로 표기돼 있어 상업 이용 전 원문 확인이 필요합니다.":
+      "Streaming RNN-T ASR. Offline transcribe() ignoring the language prompt is an unresolved bug confirmed on NVIDIA's own issue tracker, so batch transcription is out — serve it with NeMo's cache-aware streaming script (att_context_size controls latency) or the NIM container (nemotron-asr-streaming). Per the model card, one H100 sustains ~240 concurrent streams at 80ms chunks and ~2,400 at 1,120ms chunks. The 5.66GB on disk is fp32 packaging; the real parameter count is 1.42B. ⚠️ The license shows as 'other' in HF metadata — read the original text before commercial use.",
+    "다국어 zero-shot TTS입니다. 로컬 cosyvoice 패키지는 torch 2.3 세대 코드가 최신 오디오 API(torchcodec)에서 깨져 벤더 핀(torch 2.3.1·numpy 1.26.4) 격리 환경이 필요합니다. 사전 화자 목록이 비어 있는 것은 결함이 아니라 zero-shot 전용 설계입니다(참조 음성 필수). vLLM-Omni가 정확히 이 체크포인트를 구현·등재하고 있어 벤더 스택을 우회하는 서빙 경로가 있습니다.":
+      "Multilingual zero-shot TTS. The local cosyvoice package needs a vendor-pinned isolated env (torch 2.3.1, numpy 1.26.4) because its torch 2.3-era code breaks on the modern audio API (torchcodec). The empty preset-speaker list is by design, not a defect — CosyVoice3 is zero-shot only (reference audio required). vLLM-Omni implements and lists exactly this checkpoint, giving a serving path that bypasses the vendor stack.",
+    "10개 언어와 3초 클로닝, 보이스 디자인을 내세운 TTS입니다. 공식 파이썬 패키지 qwen-tts(PyPI 0.1.1, transformers 4.57.3 핀)가 로드 경로이고, vLLM-Omni도 Base·CustomVoice·VoiceDesign 체크포인트를 day-0로 등재해 서빙 경로가 둘 다 열려 있습니다. ⚠️ Base 체크포인트는 generate_custom_voice를 거부하고 generate_voice_clone(ref_audio, ref_text) 경로만 받으므로 참조 음성이 반드시 필요합니다. 파라미터 2.27B는 speech_tokenizer 0.68GB를 포함한 스테이징 가중치 기준입니다.":
+      "A TTS touting 10 languages, 3-second cloning and voice design. The official Python package qwen-tts (PyPI 0.1.1, pinned to transformers 4.57.3) is the load path, and vLLM-Omni also lists the Base, CustomVoice and VoiceDesign checkpoints day-0 — both serving routes are open. ⚠️ The Base checkpoint refuses generate_custom_voice and only accepts generate_voice_clone(ref_audio, ref_text), so reference audio is mandatory. The 2.27B parameter figure is from the staged weights including the 0.68GB speech_tokenizer.",
+    "transformers가 아니라 NeMo 생태계입니다 — 정식 릴리스가 아니라 git main 설치(nemo_toolkit[asr])가 필요하고 Python 3.10은 미지원입니다.":
+      "This is the NeMo ecosystem, not transformers — it needs a git-main install (nemo_toolkit[asr]) rather than a tagged release, and Python 3.10 is unsupported.",
+    "언어 프롬프트는 set_inference_prompt(PromptStreamingMixin)로만 전달됩니다 — 오프라인 transcribe()가 이를 읽지 않는 버그는 NVIDIA 이슈 트래커에서도 미해결로 확인됩니다. 정상 경로는 cache-aware 스트리밍 추론 스크립트(att_context_size로 지연·처리량 조절)입니다.":
+      "The language prompt only flows through set_inference_prompt (PromptStreamingMixin) — offline transcribe() ignoring it is confirmed unresolved on NVIDIA's issue tracker. The correct path is the cache-aware streaming inference script (att_context_size trades latency for throughput).",
+    "TensorRT-LLM 변환 경로는 확인되지 않습니다. NVIDIA의 프로덕션 경로는 NIM 컨테이너 nemotron-asr-streaming(스트리밍 저지연·고처리량·오프라인 3모드)이며 내부적으로 NeMo/Riva 스택입니다.":
+      "No TensorRT-LLM conversion path could be confirmed. NVIDIA's production route is the NIM container nemotron-asr-streaming (low-latency streaming, high-throughput streaming and offline modes), running the NeMo/Riva stack internally.",
+    "현재 스택에서 합성이 되지 않습니다 — torch 2.3 시절 코드가 torch 2.11 오디오 API에서 torchcodec 예외로 깨집니다(9라운드 확인). 벤더 핀(torch 2.3.1) 격리 환경에서만 동작합니다.":
+      "Synthesis does not work on the current stack — torch 2.3-era code breaks against the torch 2.11 audio API with a torchcodec exception (confirmed over nine rounds). It only runs in a vendor-pinned (torch 2.3.1) isolated environment.",
+    "사전 화자 모드가 없는 것은 설계입니다 — CosyVoice3는 zero-shot(ref_audio+ref_text) 전용이라 list_available_spks()가 빈 배열인 게 정상입니다.":
+      "The absence of a preset-speaker mode is by design — CosyVoice3 is zero-shot only (ref_audio + ref_text), so list_available_spks() returning an empty array is expected.",
+    "vLLM-Omni가 정확히 이 체크포인트를 구현·등재하고 있습니다 — vllm serve FunAudioLLM/Fun-CosyVoice3-0.5B-2512 --omni (talker+flow-matching 2단, 24kHz, 스트리밍 /v1/audio/speech/stream). 벤더의 torch 2.3 핀 스택을 완전히 우회합니다(자체 실측은 아직 없음).":
+      "vLLM-Omni implements and lists exactly this checkpoint — vllm serve FunAudioLLM/Fun-CosyVoice3-0.5B-2512 --omni (two-stage talker + flow-matching, 24kHz, streaming via /v1/audio/speech/stream). It bypasses the vendor's torch 2.3-pinned stack entirely (no in-house benchmark yet).",
+    "TensorRT-LLM 가속은 CosyVoice2 기준으로만 문서화돼 있고 CosyVoice3 확인이 없습니다. sherpa-onnx도 미구현(기능 요청 오픈) 상태입니다.":
+      "TensorRT-LLM acceleration is documented for CosyVoice2 only, with no CosyVoice3 confirmation. sherpa-onnx has not implemented it either (feature request open).",
+    "transformers 코어에는 qwen3_tts 모델 타입이 없습니다 — 공식 파이썬 패키지 qwen-tts(PyPI 0.1.1, transformers 4.57.3 핀)가 로드 경로입니다.":
+      "transformers core has no qwen3_tts model type — the official Python package qwen-tts (PyPI 0.1.1, pinned to transformers 4.57.3) is the load path.",
+    "CUDA bf16 + FlashAttention 2 권장이고 배치 합성과 스트리밍(엔드투엔드 97ms) 생성을 지원합니다. ThakiCloud는 이 패키지로 실동작을 확인했습니다.":
+      "CUDA bf16 with FlashAttention 2 is recommended; batch synthesis and streaming generation (97ms end-to-end) are supported. ThakiCloud has verified it running with this package.",
+    "vLLM-Omni가 Qwen3-TTS 시리즈(Base·CustomVoice·VoiceDesign)를 day-0로 등재하고 있습니다(/v1/audio/speech). 프로덕션 서빙은 이 경로가 정본입니다(자체 실측은 아직 없음).":
+      "vLLM-Omni lists the Qwen3-TTS series (Base, CustomVoice, VoiceDesign) with day-0 support (/v1/audio/speech). This is the canonical production serving path (no in-house benchmark yet).",
+    "메인라인 TensorRT-LLM은 멀티코드북 오디오 토큰 생성을 샘플러가 지원하지 않아 미지원입니다(기능 요청 이슈 오픈).":
+      "Mainline TensorRT-LLM cannot serve it — the sampler does not support multi-codebook audio-token generation (feature request open).",
+    "기본 생성은 768p이고 2K는 H3-Regenerate-2K 업스케일 단계를 따로 돌립니다.":
+      "Base generation is 768p; 2K requires the separate H3-Regenerate-2K upscale stage.",
+    "모델 카드 스펙입니다.":
+      "Model-card spec.",
+    "공개 양자화 변형이 아직 없고, AdaLN 브랜치(~13B)는 추론 전용 배포에서 생략할 수 있습니다.":
+      "No quantized variants published yet; the AdaLN branches (~13B) can be dropped for inference-only deploys.",
+    "증류 파이프라인은 고정 시그마 스케줄로 1단계 8스텝 + 2단계 4스텝을 돕니다.":
+      "The distilled pipeline runs a fixed sigma schedule: 8 steps stage 1 + 4 steps stage 2.",
+    "증류 체크포인트는 CFG가 내장돼 있습니다.":
+      "Distilled checkpoints have guidance baked in.",
+    "VAE 패치·시간압축 제약입니다. 어기면 자동 패드·크롭됩니다.":
+      "VAE patch/temporal-compression constraints; violations are auto-padded and cropped.",
+    "별도 체크포인트가 아니라 로드타임 플래그로 fp8 캐스트를 겁니다(scaled-mm은 Hopper 이상).":
+      "fp8 is a load-time flag, not a separate checkpoint (scaled-mm needs Hopper+).",
+    "T2V 태스크에 맞춰 튜닝된 flow-matching 타임스텝 시프트입니다.":
+      "Flow-matching timestep shift tuned for the T2V task.",
+    "고노이즈(레이아웃)·저노이즈(디테일) 전문가가 서로 다른 CFG 강도를 씁니다. 경계는 SNR 0.875입니다.":
+      "The high-noise (layout) and low-noise (detail) experts use different CFG strengths; the SNR switch boundary is 0.875.",
+    "카드가 검증한 해상도 조합입니다.":
+      "Officially validated resolutions.",
+    "MoE 2전문가 중 비활성 쪽을 내려 피크 VRAM을 줄입니다(활성은 14B, 디스크는 27B).":
+      "Offloads the inactive expert of the two-expert MoE to cut peak VRAM (14B active, 27B on disk).",
+    "이미지 조건이 붙는 I2V는 T2V(12.0)보다 낮은 시프트가 최적입니다.":
+      "With image conditioning, I2V wants a lower shift than T2V's 12.0.",
+    "I2V는 두 전문가가 같은 CFG를 쓰고 경계는 SNR 0.900입니다.":
+      "I2V weights both experts equally; the SNR boundary is 0.900.",
+    "출력 종횡비는 고정 W×H가 아니라 소스 이미지를 따릅니다.":
+      "Output aspect follows the source image rather than a fixed WxH.",
+    "비활성 전문가 오프로드 + dtype 변환으로 피크 VRAM을 줄입니다.":
+      "Cuts peak VRAM by offloading the inactive expert and converting dtype.",
+    "모델 카드 퀵스타트 기본값입니다. 줄이면 빨라지지만 세부 묘사가 무너집니다.":
+      "Model-card quick-start default. Fewer steps are faster but fine detail degrades.",
+    "높일수록 프롬프트 충실도가 오르지만 4를 넘기면 아티팩트가 늘어납니다.":
+      "Higher improves prompt adherence; past 4 artifacts increase.",
+    "학습된 종횡비 버킷을 그대로 쓰는 것이 가장 안정적입니다.":
+      "Stick to the trained aspect-ratio buckets for the most stable output.",
+    "모델 카드가 제공하는 저품질·AI 흔적 억제용 네거티브 프롬프트를 쓰면 기본 품질이 올라갑니다.":
+      "Using the card-provided quality-defect negative prompt raises baseline quality.",
+    "기본 40스텝이고, Lightning 증류 LoRA를 얹으면 4스텝까지 줄일 수 있습니다.":
+      "Default is 40 steps; the Lightning distillation LoRA cuts it to ~4.",
+    "파이프라인은 guidance_scale 1.0을 두고 true_cfg_scale이 실제 유도를 담당합니다.":
+      "The pipeline keeps guidance_scale at 1.0; true_cfg_scale does the real guidance.",
+    "카드 기본값은 빈 문자열이 아니라 공백 한 칸입니다.":
+      "The card default is a single-space string, not an empty one.",
+    "레이어 수를 지정한 RGBA 분해가 핵심 기능이고, 결과 레이어를 다시 분해할 수도 있습니다.":
+      "Variable-count RGBA layer decomposition is the core capability; layers can be decomposed recursively.",
+    "카드가 못박은 하드 요구사항입니다 — 낮은 버전은 로드 자체가 안 됩니다.":
+      "A hard requirement stated on the card — older versions fail to load.",
+    "증류(Decoupled-DMD) 모델이라 CFG를 꺼야 합니다 — 카드가 'Turbo는 guidance 0'을 명시합니다.":
+      "A distilled (Decoupled-DMD) model — the card states guidance must be 0 for Turbo.",
+    "증류 목표 스텝 수입니다. 더 늘려도 품질이 늘지 않습니다.":
+      "The distillation target step count; more steps do not buy quality.",
+    "카드 퀵스타트 기본값입니다.":
+      "Card quick-start default.",
+    "가이던스 증류 체크포인트라 4스텝이 기본입니다.":
+      "A guidance-distilled checkpoint — 4 steps is the default.",
+    "가이던스가 증류로 내장돼 있어 CFG를 더 걸 필요가 없습니다.":
+      "Guidance is baked in by distillation; extra CFG is unnecessary.",
+    "증류가 아닌 고전 CFG 모델의 표준 기본값입니다.":
+      "Standard default for a classic non-distilled CFG model.",
+    "카드의 base+refiner 앙상블 예제가 40스텝을 씁니다.":
+      "The card's base+refiner ensemble example uses 40 steps.",
+    "디테일이 필요하면 refiner로 마지막 20%를 넘기는 앙상블 파이프라인이 카드 권장입니다.":
+      "For extra detail the card recommends handing the last ~20% of denoising to the refiner.",
+    "카드가 추론에 FA2를 요구합니다(transformers>=5.5.3, torch>=2.9.1).":
+      "The card requires FA2 for inference (transformers>=5.5.3, torch>=2.9.1).",
+    "키워드 바이어싱이 희귀 고유명사·약어 인식률을 올립니다.":
+      "Keyword biasing improves recall of rare names and acronyms.",
+    "기본값은 긴 오디오에서 전사를 자릅니다 — 길면 올리세요.":
+      "The default truncates long transcripts — raise it for long audio.",
+    "처리량이 필요하면 올립니다. 동시성이 실시간 배수를 크게 늘립니다.":
+      "Raise for throughput; concurrency multiplies the realtime factor.",
+    "내장 언어감지가 있고 스트리밍·오프라인이 단일 모델입니다.":
+      "Built-in language ID; one model covers streaming and offline.",
+    "프로세서 기본값을 공유합니다.":
+      "Shares the 1.7B processor defaults.",
+    "model.transcribe() 입력 스펙입니다. 긴 오디오는 자동 청킹됩니다.":
+      "Input spec of model.transcribe(); long audio is auto-chunked.",
+    "인코더 torch.compile + CPU 디토크나이즈 오버랩으로 처리량을 올립니다.":
+      "torch.compile on the encoder plus CPU-detokenize overlap raises throughput.",
+    "그리디 + 온도 폴백(0→1.0)이 카드 기본입니다. 저신뢰 구간만 재디코딩합니다.":
+      "Greedy with the temperature-fallback tuple (0→1.0) is the card default; only low-confidence spans re-decode.",
+    "청크 간 환각 루프를 막습니다.":
+      "Prevents hallucination loops across chunks.",
+    "30초가 네이티브 학습 창이고 448이 디코더 상한입니다.":
+      "30s is the native training window; 448 is the decoder cap.",
+    "생성 설정을 공유하고, 4레이어 디코더로 2-3배 빠릅니다.":
+      "Shares large-v3's generation config; the 4-layer decoder is 2-3x faster.",
+    "룩어헤드로 지연·정확도를 거래합니다 — [56,0]은 80ms 초저지연, [56,13]은 1.12s 최고 정확도.":
+      "Lookahead trades latency for accuracy — [56,0] is 80ms ultra-low-latency, [56,13] is 1.12s highest-accuracy.",
+    "청크가 클수록 처리량이 오르고(동시 스트림 240→2,400) 지연이 늘어납니다.":
+      "Bigger chunks raise throughput (240→2,400 concurrent streams) at the cost of latency.",
+    "제로샷 클로닝이 음색·억양·운율을 그대로 가져갑니다.":
+      "Zero-shot cloning captures timbre, accent and prosody from the clip.",
+    "CFG는 유도 강도-자연스러움, 타임스텝은 품질-속도 트레이드오프입니다.":
+      "cfg trades guidance strength vs naturalness; timesteps trade quality vs speed.",
+    "감정 강도입니다. 0.7 이상은 표현이 커지고 말도 빨라집니다.":
+      "Emotional intensity; 0.7+ gets expressive and speeds up delivery.",
+    "참조 음성 충실도입니다. 드라마틱한 낭독은 0.3 근처가 권장입니다.":
+      "Reference-voice fidelity; ~0.3 is recommended for dramatic reads.",
+    "보이스 팩이 음색과 언어를 결정합니다.":
+      "The voice pack selects timbre and language.",
+    "장문은 speed 0.9와 정규식 청킹이 말 빨라짐을 막아줍니다.":
+      "For long text, speed 0.9 plus regex chunking prevents rushed delivery.",
+    "instruct 모드는 자연어 지시문으로 스타일을 제어합니다.":
+      "Instruct mode controls style via a natural-language directive.",
+    "운율·감정을 지시문으로 조절합니다.":
+      "Prosody and emotion are steered by the directive.",
+    "실용 스트리밍 지연은 약 150ms입니다.":
+      "Practical streaming latency is ~150ms.",
+    "Base는 제로샷 클로닝 전용이라 참조 음성이 필수입니다.":
+      "Base is zero-shot-clone only, so reference audio is mandatory.",
+    "텍스트 언어의 네이티브 화자를 고르는 것이 카드 권장입니다.":
+      "Picking a speaker native to the text language is the card's recommendation.",
+    "generate_custom_voice에 스타일 지시를 넘길 수 있습니다.":
+      "A style directive can be passed to generate_custom_voice.",
   };
 
   let lang = "ko";

@@ -395,5 +395,40 @@ console.log("\nhierarchy gate:");
   ok("the UI defaults to a priced preset rather than the Custom placeholder", /pickPriced/.test(app));
 }
 
+// ---- Quant ladder + tuning guide ------------------------------------------
+{
+  // Schema: quants entries are real repo references, tuning entries carry note+source.
+  const all = [...media, ...speech];
+  ok("every quants[] entry has fmt + owner/name hf + note",
+    all.every(m => (m.quants || []).every(q =>
+      typeof q.fmt === "string" && /^[\w.-]+\/[\w.,-]+$/.test(q.hf || "") && typeof q.note === "string" && typeof q.official === "boolean")));
+  ok("every tuning[] entry has param, value, note and an http(s) source",
+    all.every(m => (m.tuning || []).every(t =>
+      t.param && t.value && t.note && /^https?:\/\//.test(t.source || ""))));
+  ok("every media and speech model carries a tuning guide or is licence-blocked",
+    all.every(m => (m.tuning && m.tuning.length) || m.blocked));
+
+  // Ladder physics: fp16 row matches the main compute path; weights shrink monotonically.
+  const anyGpu = REF;
+  ok("mediaQuantLadder fp16 row equals computeMedia vramTotal", media.every(m => {
+    const r = C.computeMedia(m, anyGpu, "fp16", {});
+    const row = C.mediaQuantLadder(m, anyGpu, {}).find(x => x.id === "fp16");
+    return Math.abs(row.totalGB - r.vramTotal) < 0.05;
+  }));
+  ok("speechQuantLadder fp16 row equals computeSpeech vramTotal", speech.every(m => {
+    const r = C.computeSpeech(m, anyGpu, "fp16", {});
+    const row = C.speechQuantLadder(m, anyGpu).find(x => x.id === "fp16");
+    return Math.abs(row.totalGB - r.vramTotal) < 0.05;
+  }));
+  const mono = rows => rows.every((x, i) => i === 0 || x.weightsGB <= rows[i - 1].weightsGB + 1e-9);
+  ok("ladder weights are monotonically non-increasing across tiers",
+    media.every(m => mono(C.mediaQuantLadder(m, anyGpu, {}))) &&
+    speech.every(m => mono(C.speechQuantLadder(m, anyGpu))));
+  ok("ladder never claims a speed field (quant is VRAM-only here)",
+    C.mediaQuantLadder(media[0], anyGpu, {}).every(x => !("tokS" in x) && !("secondsPerItem" in x)));
+  ok("the ladder UI block exists and is wired", /mplaceQuantLadder/.test(html) && /renderMPlaceQuantLadder/.test(app));
+  ok("the tuning UI block exists and is wired", /mediaTuningBlock/.test(html) && /renderMediaTuning/.test(app));
+}
+
 console.log(`\nmedia+speech+serving: ${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

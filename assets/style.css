@@ -218,6 +218,8 @@ footer a { color: var(--accent); }
 /* quant ladder */
 .ladder { display: flex; flex-direction: column; gap: 4px; }
 #mplaceLadder .ladder-row { grid-template-columns: 78px 1fr 76px 150px; }
+#mplaceQuantLadder .ladder-row { grid-template-columns: 110px 1fr 80px 96px; }
+.ladder-row:disabled { opacity: .55; cursor: default; }
 #mplaceLadder .lr-tok { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 #mplaceNodeCards .ncard-stack { height: 210px; }
 .ladder-row { display: grid; grid-template-columns: 150px 1fr 62px 78px; align-items: center; gap: 10px;

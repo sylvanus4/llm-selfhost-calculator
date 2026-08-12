@@ -308,6 +308,7 @@ function renderSpeech() {
     el("mediaBlocked").innerHTML = `<b>${tr("speech.noruntime")}</b><div style="margin-top:4px">${esc(td(model.blocked.reason))}</div>`;
   } else el("mediaBlocked").hidden = true;
   el("mediaBody").hidden = false;
+  renderMediaTuning(model);
 
   const gpuShort = esc(gpu.name.split(" (")[0]);
   el("mediaFitBadge").innerHTML = r.fits
@@ -451,6 +452,7 @@ function renderMedia() {
     el("mediaBlocked").hidden = true;
   }
   el("mediaBody").hidden = false;
+  renderMediaTuning(model);
 
   const steps = parseInt(el("steps").value, 10);
   const [w, h] = el("resolution").value.split("x").map(Number);
@@ -726,6 +728,64 @@ function renderMediaPlacement() {
   el("mplaceWhy").innerHTML = (isSpeech()
     ? [tr("mplace.why.speech1"), tr("mplace.why.speech2")]
     : [tr("mplace.why.media1"), tr("mplace.why.media2")]).map(x => `<div>${x}</div>`).join("");
+
+  renderMPlaceQuantLadder(model, gpu);
+}
+
+// Quant ladder for image/video/speech — same visual grammar as the Spark ladder (bar = vs
+// usable, green fit, red overflow). Quantisation moves VRAM only, so rows show fit and GPU
+// count, never a speed claim. ✓ marks a tier that has a real published checkpoint (model.quants,
+// every repo id verified live); rows without one are an arithmetic what-if.
+function renderMPlaceQuantLadder(model, gpu) {
+  const speech = isSpeech();
+  const r = speech ? state.lastSpeech : state.lastMedia;
+  const rows = speech
+    ? LLMCalc.speechQuantLadder(model, gpu)
+    : LLMCalc.mediaQuantLadder(model, gpu, r ? { width: r.width, height: r.height, frames: r.frames, batch: r.batch } : {});
+  const cur = el("quant").value;
+  const maxBar = Math.max(gpu.vram_gb, ...rows.map(x => x.totalGB)) || 1;
+  const tierCkpts = q => (model.quants || []).filter(k =>
+    q === "fp8" ? k.fmt.indexOf("fp8") === 0
+      : q === "int8" ? /8|ct2/.test(k.fmt)
+        : q === "int4" ? /4|gguf/.test(k.fmt) : false);
+  el("mplaceQuantLadder").innerHTML = rows.map(x => {
+    const sel = x.id === cur || (x.id === "fp16" && !rows.some(y => y.id === cur));
+    const totalPct = Math.min(100, x.totalGB / maxBar * 100);
+    const overPct = x.totalGB > gpu.vram_gb ? Math.min(100, (x.totalGB - gpu.vram_gb) / maxBar * 100) : 0;
+    const fitPct = Math.max(0, totalPct - overPct);
+    const usablePct = gpu.vram_gb / maxBar * 100;
+    // Media resets int4 back to fp16 (no DiT serving path at int4 in our engines) — keep that
+    // row visible as information but not selectable.
+    const dead = !speech && x.id === "int4";
+    return `<button type="button" class="ladder-row${sel ? " sel" : ""}"${dead ? " disabled" : ""} data-mq="${x.id}" aria-pressed="${sel}">
+      <span class="lr-label">${esc(x.label)}</span>
+      <span class="lr-bar"><span class="lr-fit" style="width:${fitPct}%"></span><span class="lr-over" style="width:${overPct}%"></span><span class="lr-usable" style="left:${usablePct}%"></span></span>
+      <span class="lr-gb ${x.fits ? "" : "over"}">${fmt(x.totalGB, 1)} GB</span>
+      <span class="lr-tok">${x.gpusNeeded}× GPU${tierCkpts(x.id).length ? " ✓" : ""}</span>
+    </button>`;
+  }).join("");
+  const ck = model.quants || [];
+  el("mplaceQuantCkpts").innerHTML =
+    (ck.length
+      ? `<div class="dim" style="margin:6px 0 2px">${tr("mplace.qckpts")}</div>` + ck.map(k =>
+        `<div>· <b>${esc(k.fmt)}</b>${k.official ? ` <span class="badge ok">${tr("tune.official")}</span>` : ""} — ` +
+        `<a href="https://huggingface.co/${esc(k.hf)}" target="_blank" rel="noopener">${esc(k.hf)}</a>` +
+        `${k.runtime ? ` <span class="dim">(${esc(k.runtime)})</span>` : ""}` +
+        `${k.note ? ` <span class="dim">${esc(k.note)}</span>` : ""}</div>`).join("")
+      : "") +
+    `<div class="dim" style="margin-top:6px">${tr("mplace.qarith")}</div>`;
+}
+
+// Per-model tuning guide, curated from the model card / vendor repo (source linked per row).
+function renderMediaTuning(model) {
+  const rows = model.tuning || [];
+  el("mediaTuningBlock").hidden = rows.length === 0;
+  if (!rows.length) return;
+  el("mediaTuning").innerHTML = rows.map(t =>
+    `<div style="margin-bottom:6px"><b>${esc(t.param)}</b> = ${esc(t.value)}` +
+    `${t.range && t.range !== "-" ? ` <span class="dim">(${esc(t.range)})</span>` : ""}` +
+    ` <a class="dim" href="${esc(t.source)}" target="_blank" rel="noopener" title="${esc(t.source)}">↗</a>` +
+    `<div class="dim">${esc(td(t.note))}</div></div>`).join("");
 }
 
 // One renderer for the three engine tabs — they answer the same question with different data.
@@ -1402,6 +1462,10 @@ async function init() {
 
   document.querySelectorAll('input[name="mplacenodes"]').forEach(radio =>
     radio.addEventListener("change", () => { state.mplaceNodes = parseInt(radio.value, 10); render(); }));
+  el("mplaceQuantLadder").addEventListener("click", (e) => {
+    const row = e.target.closest(".ladder-row");
+    if (row && !row.disabled && row.dataset.mq) { el("quant").value = row.dataset.mq; render(); }
+  });
   el("mplaceLadder").addEventListener("click", (e) => {
     const row = e.target.closest(".ladder-row");
     if (row && row.dataset.n) {

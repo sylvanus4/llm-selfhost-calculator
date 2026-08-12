@@ -1,6 +1,6 @@
 {
   "_note": "Open-weight IMAGE and VIDEO generation models, newest first. Every parameter count here was derived from the ACTUAL staged weights (safetensors shard sizes and safetensors headers read out of ThakiCloud's s3://ai-platform/global/models registry) divided by the on-disk dtype — not from press material. Component split is backbone (UNet/DiT) / text encoder / VAE-and-aux, because for diffusion the text encoder is often a third of resident VRAM and gets forgotten in back-of-envelope sizing. `measured` rows are OUR OWN single-B200 benchmark runs (2026-08, batch 1, eager bf16, no torch.compile); models without one are marked estimated and the UI says so. Diffusion is COMPUTE bound, not bandwidth bound: there is no KV cache, every denoising step is a full forward over all latent tokens, and batching is nearly worthless (measured: Qwen-Image 2.51 -> 2.37 s/img for VRAM 58 -> 87GB). Quantisation is modelled as a VRAM saving only, never a speedup, because our measurement shows fp8 ALONE is slower (FLUX.2-klein 0.83x) and only wins when fused with torch.compile (1.72x). `catalog: true` = present in the ThakiCloud demo model catalog (project ai-platform).",
-  "_updated": "2026-08-10",
+  "_updated": "2026-08-12",
   "_measured_basis": "Single NVIDIA B200, batch 1, bf16 eager, no torch.compile, CFG disabled. Image models at 1024x1024 / 20 steps. Source: media-workspace measurement ledger, docs/measurements/2026-08-10-b200-bench-ledger.md.",
   "models": [
     {
@@ -38,7 +38,31 @@
       "height": 768,
       "frames": 121,
       "fps": 24,
-      "note": "오디오까지 함께 만드는 옴니모달 DiT(50블록·hidden 5376, patch 1x2x2). HF 인덱스 실측으로 트랜스포머 66.28GB=33.14B, 텍스트 인코더 Qwen3-VL 66.71GB=33.36B — 둘을 합치면 bf16 상주 가중치만 약 134GB라 H200 두 장 또는 GB200급이 필요합니다. VisualVAE는 공간 16배·시간 4배 압축에 latent 24채널, 768p 기준 4~15초·24fps. 스텝 수와 CFG는 모델 카드에 공개되지 않아 같은 계열 관행값(40스텝·CFG)을 가정했으므로 속도는 추정값입니다."
+      "note": "오디오까지 함께 만드는 옴니모달 DiT(50블록·hidden 5376, patch 1x2x2). HF 인덱스 실측으로 트랜스포머 66.28GB=33.14B, 텍스트 인코더 Qwen3-VL 66.71GB=33.36B — 둘을 합치면 bf16 상주 가중치만 약 134GB라 H200 두 장 또는 GB200급이 필요합니다. VisualVAE는 공간 16배·시간 4배 압축에 latent 24채널, 768p 기준 4~15초·24fps. 스텝 수와 CFG는 모델 카드에 공개되지 않아 같은 계열 관행값(40스텝·CFG)을 가정했으므로 속도는 추정값입니다.",
+      "tuning": [
+        {
+          "param": "resolution",
+          "value": "768p",
+          "range": "768p · 2K는 별도 업스케일",
+          "note": "기본 생성은 768p이고 2K는 H3-Regenerate-2K 업스케일 단계를 따로 돌립니다.",
+          "source": "https://huggingface.co/MiniMaxAI/MiniMax-H3"
+        },
+        {
+          "param": "fps / duration",
+          "value": "24fps · 4-15s",
+          "range": "고정",
+          "note": "모델 카드 스펙입니다.",
+          "source": "https://huggingface.co/MiniMaxAI/MiniMax-H3"
+        },
+        {
+          "param": "precision",
+          "value": "bf16",
+          "range": "bf16만 배포",
+          "note": "공개 양자화 변형이 아직 없고, AdaLN 브랜치(~13B)는 추론 전용 배포에서 생략할 수 있습니다.",
+          "source": "https://huggingface.co/MiniMaxAI/MiniMax-H3"
+        }
+      ],
+      "quants": []
     },
     {
       "id": "ltx-2.3",
@@ -78,7 +102,38 @@
         "batch": 1,
         "approx": true
       },
-      "note": "오디오까지 한 모델에서 같이 생성하는 DiT(48블록·hidden 4096). 체크포인트 단일 파일 23.07B = DiT 21.0B + VAE·보코더·투영 2.07B이고, 텍스트 인코더는 별도 gemma-3-12b-it(약 12.2B)가 필수라 실제 상주 가중치는 그 둘의 합입니다. 배포판은 8스텝·CFG 미사용 distilled 버전. 가로세로는 32의 배수, 프레임 수는 8의 배수+1이어야 합니다. 측정값은 B200 1클립 약 12초로 대략치이며 스텝 수 외 조건이 기록되지 않았습니다."
+      "note": "오디오까지 한 모델에서 같이 생성하는 DiT(48블록·hidden 4096). 체크포인트 단일 파일 23.07B = DiT 21.0B + VAE·보코더·투영 2.07B이고, 텍스트 인코더는 별도 gemma-3-12b-it(약 12.2B)가 필수라 실제 상주 가중치는 그 둘의 합입니다. 배포판은 8스텝·CFG 미사용 distilled 버전. 가로세로는 32의 배수, 프레임 수는 8의 배수+1이어야 합니다. 측정값은 B200 1클립 약 12초로 대략치이며 스텝 수 외 조건이 기록되지 않았습니다.",
+      "tuning": [
+        {
+          "param": "steps",
+          "value": "8+4 (2단계 증류)",
+          "range": "base는 ~40",
+          "note": "증류 파이프라인은 고정 시그마 스케줄로 1단계 8스텝 + 2단계 4스텝을 돕니다.",
+          "source": "https://github.com/Lightricks/LTX-2/blob/main/README.md"
+        },
+        {
+          "param": "guidance_scale",
+          "value": "1.0 (증류)",
+          "range": "base는 표준 CFG",
+          "note": "증류 체크포인트는 CFG가 내장돼 있습니다.",
+          "source": "https://github.com/Lightricks/LTX-2/blob/main/README.md"
+        },
+        {
+          "param": "resolution / frames",
+          "value": "변 32배수 · 프레임 8n+1",
+          "range": "-",
+          "note": "VAE 패치·시간압축 제약입니다. 어기면 자동 패드·크롭됩니다.",
+          "source": "https://github.com/Lightricks/LTX-2/blob/main/README.md"
+        },
+        {
+          "param": "quantization",
+          "value": "--quantization fp8-cast | fp8-scaled-mm",
+          "range": "옵션",
+          "note": "별도 체크포인트가 아니라 로드타임 플래그로 fp8 캐스트를 겁니다(scaled-mm은 Hopper 이상).",
+          "source": "https://github.com/Lightricks/LTX-2/blob/main/README.md"
+        }
+      ],
+      "quants": []
     },
     {
       "id": "wan2.2-t2v-a14b",
@@ -108,7 +163,60 @@
       "frames": 81,
       "fps": 16,
       "frame_rule": "4n+1",
-      "note": "전문가 2개(high-noise·low-noise)를 노이즈 구간으로 갈아 끼우는 MoE라 한 스텝에는 14.3B만 계산에 쓰이지만, 전환 비용을 피하려면 28.6B 양쪽을 모두 VRAM에 올려둡니다. 텍스트 인코더 UMT5-XXL 5.68B가 별도로 붙습니다. 디스크 가중치는 fp32(117.5 GiB)로 배포되지만 서빙은 bf16 기준입니다. 프레임 수는 4의 배수+1(81 ≈ 16fps에서 5.06초). 자체 지연 측정치가 없어 속도는 추정값입니다."
+      "note": "전문가 2개(high-noise·low-noise)를 노이즈 구간으로 갈아 끼우는 MoE라 한 스텝에는 14.3B만 계산에 쓰이지만, 전환 비용을 피하려면 28.6B 양쪽을 모두 VRAM에 올려둡니다. 텍스트 인코더 UMT5-XXL 5.68B가 별도로 붙습니다. 디스크 가중치는 fp32(117.5 GiB)로 배포되지만 서빙은 bf16 기준입니다. 프레임 수는 4의 배수+1(81 ≈ 16fps에서 5.06초). 자체 지연 측정치가 없어 속도는 추정값입니다.",
+      "tuning": [
+        {
+          "param": "sample_shift",
+          "value": "12.0",
+          "range": "공식 config",
+          "note": "T2V 태스크에 맞춰 튜닝된 flow-matching 타임스텝 시프트입니다.",
+          "source": "https://github.com/Wan-Video/Wan2.2/blob/main/wan/configs/wan_t2v_A14B.py"
+        },
+        {
+          "param": "guide_scale",
+          "value": "고노이즈 4.0 / 저노이즈 3.0",
+          "range": "전문가별",
+          "note": "고노이즈(레이아웃)·저노이즈(디테일) 전문가가 서로 다른 CFG 강도를 씁니다. 경계는 SNR 0.875입니다.",
+          "source": "https://github.com/Wan-Video/Wan2.2/blob/main/wan/configs/wan_t2v_A14B.py"
+        },
+        {
+          "param": "resolution",
+          "value": "1280x720 / 480P · 5s",
+          "range": "공식 검증 해상도",
+          "note": "카드가 검증한 해상도 조합입니다.",
+          "source": "https://huggingface.co/Wan-AI/Wan2.2-T2V-A14B"
+        },
+        {
+          "param": "offload",
+          "value": "--offload_model True",
+          "range": "옵션",
+          "note": "MoE 2전문가 중 비활성 쪽을 내려 피크 VRAM을 줄입니다(활성은 14B, 디스크는 27B).",
+          "source": "https://huggingface.co/Wan-AI/Wan2.2-T2V-A14B"
+        }
+      ],
+      "quants": [
+        {
+          "fmt": "fp8",
+          "hf": "nvidia/Wan2.2-T2V-A14B-Diffusers-FP8",
+          "official": false,
+          "runtime": "diffusers",
+          "note": "NVIDIA-published fp8 build"
+        },
+        {
+          "fmt": "fp8",
+          "hf": "Comfy-Org/Wan_2.2_ComfyUI_Repackaged",
+          "official": false,
+          "runtime": "ComfyUI",
+          "note": "fp8_scaled, split high/low-noise experts"
+        },
+        {
+          "fmt": "gguf",
+          "hf": "QuantStack/Wan2.2-T2V-A14B-GGUF",
+          "official": false,
+          "runtime": "ComfyUI-GGUF",
+          "note": "Q2_K-Q8"
+        }
+      ]
     },
     {
       "id": "wan2.2-i2v-a14b",
@@ -138,7 +246,60 @@
       "frames": 81,
       "fps": 16,
       "frame_rule": "4n+1",
-      "note": "T2V와 같은 MoE 백본에 입력 이미지 조건화가 붙은 image-to-video 버전. 해상도는 입력 이미지 비율을 따라가고 기본 픽셀 예산은 480p급(832x480)입니다. ThakiCloud 실측에서 조건화가 실제로 작동함을 2x2 교차 상관 행렬로 확인했습니다(대각 1.000/0.999 대 비대각 -0.114/-0.119). 자체 지연 측정치가 없어 속도는 추정값입니다."
+      "note": "T2V와 같은 MoE 백본에 입력 이미지 조건화가 붙은 image-to-video 버전. 해상도는 입력 이미지 비율을 따라가고 기본 픽셀 예산은 480p급(832x480)입니다. ThakiCloud 실측에서 조건화가 실제로 작동함을 2x2 교차 상관 행렬로 확인했습니다(대각 1.000/0.999 대 비대각 -0.114/-0.119). 자체 지연 측정치가 없어 속도는 추정값입니다.",
+      "tuning": [
+        {
+          "param": "sample_shift",
+          "value": "5.0",
+          "range": "공식 config",
+          "note": "이미지 조건이 붙는 I2V는 T2V(12.0)보다 낮은 시프트가 최적입니다.",
+          "source": "https://github.com/Wan-Video/Wan2.2/blob/main/wan/configs/wan_i2v_A14B.py"
+        },
+        {
+          "param": "guide_scale",
+          "value": "3.5 / 3.5",
+          "range": "전문가별 대칭",
+          "note": "I2V는 두 전문가가 같은 CFG를 쓰고 경계는 SNR 0.900입니다.",
+          "source": "https://github.com/Wan-Video/Wan2.2/blob/main/wan/configs/wan_i2v_A14B.py"
+        },
+        {
+          "param": "resolution",
+          "value": "입력 이미지 종횡비 따라감",
+          "range": "480P/720P",
+          "note": "출력 종횡비는 고정 W×H가 아니라 소스 이미지를 따릅니다.",
+          "source": "https://huggingface.co/Wan-AI/Wan2.2-I2V-A14B"
+        },
+        {
+          "param": "offload",
+          "value": "--offload_model True --convert_model_dtype",
+          "range": "옵션",
+          "note": "비활성 전문가 오프로드 + dtype 변환으로 피크 VRAM을 줄입니다.",
+          "source": "https://huggingface.co/Wan-AI/Wan2.2-I2V-A14B"
+        }
+      ],
+      "quants": [
+        {
+          "fmt": "gguf",
+          "hf": "QuantStack/Wan2.2-I2V-A14B-GGUF",
+          "official": false,
+          "runtime": "ComfyUI-GGUF",
+          "note": "Q2_K-Q8"
+        },
+        {
+          "fmt": "fp8",
+          "hf": "Comfy-Org/Wan_2.2_ComfyUI_Repackaged",
+          "official": false,
+          "runtime": "ComfyUI",
+          "note": "fp8_scaled, split experts"
+        },
+        {
+          "fmt": "fp8",
+          "hf": "Kijai/WanVideo_comfy_fp8_scaled",
+          "official": false,
+          "runtime": "ComfyUI (WanVideoWrapper)",
+          "note": "community fp8_scaled mirror"
+        }
+      ]
     },
     {
       "id": "qwen-image-2512",
@@ -173,7 +334,60 @@
         "vram_gb": 58.5,
         "clip_score": 35.98
       },
-      "note": "DiT 60블록·hidden 3072의 20B 백본에 Qwen2.5-VL 7B(8.29B) 텍스트 인코더가 붙어, 아무것도 양자화하지 않으면 상주 가중치만 57.7GB입니다 — 80GB 한 장에 겨우 들어가는 크기라 텍스트 인코더를 빼먹고 계산하면 어긋납니다. 모델 카드 기본값은 50스텝·true_cfg 4.0이고, 측정은 20스텝·CFG 미사용 조건이었습니다."
+      "note": "DiT 60블록·hidden 3072의 20B 백본에 Qwen2.5-VL 7B(8.29B) 텍스트 인코더가 붙어, 아무것도 양자화하지 않으면 상주 가중치만 57.7GB입니다 — 80GB 한 장에 겨우 들어가는 크기라 텍스트 인코더를 빼먹고 계산하면 어긋납니다. 모델 카드 기본값은 50스텝·true_cfg 4.0이고, 측정은 20스텝·CFG 미사용 조건이었습니다.",
+      "tuning": [
+        {
+          "param": "steps",
+          "value": "50",
+          "range": "20-100",
+          "note": "모델 카드 퀵스타트 기본값입니다. 줄이면 빨라지지만 세부 묘사가 무너집니다.",
+          "source": "https://huggingface.co/Qwen/Qwen-Image-2512"
+        },
+        {
+          "param": "true_cfg_scale",
+          "value": "4.0",
+          "range": "2.5-4.0",
+          "note": "높일수록 프롬프트 충실도가 오르지만 4를 넘기면 아티팩트가 늘어납니다.",
+          "source": "https://huggingface.co/Qwen/Qwen-Image-2512"
+        },
+        {
+          "param": "resolution",
+          "value": "1328x1328",
+          "range": "1:1 1328² · 16:9 1664x928",
+          "note": "학습된 종횡비 버킷을 그대로 쓰는 것이 가장 안정적입니다.",
+          "source": "https://huggingface.co/Qwen/Qwen-Image-2512"
+        },
+        {
+          "param": "negative_prompt",
+          "value": "카드 제공 결함 억제 문자열",
+          "range": "-",
+          "note": "모델 카드가 제공하는 저품질·AI 흔적 억제용 네거티브 프롬프트를 쓰면 기본 품질이 올라갑니다.",
+          "source": "https://huggingface.co/Qwen/Qwen-Image-2512"
+        }
+      ],
+      "quants": [
+        {
+          "fmt": "gguf",
+          "hf": "unsloth/Qwen-Image-2512-GGUF",
+          "official": false,
+          "runtime": "ComfyUI-GGUF",
+          "note": "Q4-Q8, ~7-20GB"
+        },
+        {
+          "fmt": "fp8",
+          "hf": "unsloth/Qwen-Image-2512-FP8",
+          "official": false,
+          "runtime": "ComfyUI / diffusers",
+          "note": "single-file fp8, ~20.5GB"
+        },
+        {
+          "fmt": "int4-svdquant",
+          "hf": "nunchaku-ai/nunchaku-qwen-image",
+          "official": false,
+          "runtime": "Nunchaku (SVDQuant)",
+          "note": "INT4 (pre-Blackwell) / NVFP4 (Blackwell)"
+        }
+      ]
     },
     {
       "id": "qwen-image-edit-2511",
@@ -198,7 +412,46 @@
       "width": 1024,
       "height": 1024,
       "measured_from": "qwen-image-2512",
-      "note": "Qwen-Image와 동일한 20B 백본·인코더를 쓰는 이미지 편집(다중 이미지 합성) 버전이라 VRAM 요구도 같습니다. 출력 해상도는 입력 이미지에 따라 달라지므로 여기 기본값은 계산용 가정치입니다. 기본 40스텝. 자체 지연 측정치가 없어 속도는 같은 계열의 추정값입니다."
+      "note": "Qwen-Image와 동일한 20B 백본·인코더를 쓰는 이미지 편집(다중 이미지 합성) 버전이라 VRAM 요구도 같습니다. 출력 해상도는 입력 이미지에 따라 달라지므로 여기 기본값은 계산용 가정치입니다. 기본 40스텝. 자체 지연 측정치가 없어 속도는 같은 계열의 추정값입니다.",
+      "tuning": [
+        {
+          "param": "steps",
+          "value": "40",
+          "range": "25-40 · Lightning LoRA 4",
+          "note": "기본 40스텝이고, Lightning 증류 LoRA를 얹으면 4스텝까지 줄일 수 있습니다.",
+          "source": "https://huggingface.co/lightx2v/Qwen-Image-Edit-2511-Lightning"
+        },
+        {
+          "param": "true_cfg_scale",
+          "value": "4.0 (guidance_scale 1.0)",
+          "range": "-",
+          "note": "파이프라인은 guidance_scale 1.0을 두고 true_cfg_scale이 실제 유도를 담당합니다.",
+          "source": "https://huggingface.co/Qwen/Qwen-Image-Edit-2511"
+        },
+        {
+          "param": "negative_prompt",
+          "value": "\" \" (공백 1칸)",
+          "range": "-",
+          "note": "카드 기본값은 빈 문자열이 아니라 공백 한 칸입니다.",
+          "source": "https://huggingface.co/Qwen/Qwen-Image-Edit-2511"
+        }
+      ],
+      "quants": [
+        {
+          "fmt": "gguf",
+          "hf": "unsloth/Qwen-Image-Edit-2511-GGUF",
+          "official": false,
+          "runtime": "ComfyUI-GGUF",
+          "note": "Q4-Q8, ~7-20GB"
+        },
+        {
+          "fmt": "int4-svdquant",
+          "hf": "nunchaku-ai/nunchaku-qwen-image-edit",
+          "official": false,
+          "runtime": "Nunchaku (SVDQuant)",
+          "note": "INT4 / NVFP4 (family repo)"
+        }
+      ]
     },
     {
       "id": "qwen-image-layered",
@@ -223,7 +476,39 @@
       "width": 1024,
       "height": 1024,
       "measured_from": "qwen-image-2512",
-      "note": "한 번의 50스텝 패스로 이미지를 RGBA 레이어 여러 장으로 분해해 내놓는 변형입니다. 레이어 수를 늘려도 패스가 늘지 않으므로 비용은 일반 Qwen-Image와 같은 급으로 봅니다. 백본·인코더가 동일해 VRAM도 같습니다. 자체 지연 측정치가 없어 속도는 추정값입니다."
+      "note": "한 번의 50스텝 패스로 이미지를 RGBA 레이어 여러 장으로 분해해 내놓는 변형입니다. 레이어 수를 늘려도 패스가 늘지 않으므로 비용은 일반 Qwen-Image와 같은 급으로 봅니다. 백본·인코더가 동일해 VRAM도 같습니다. 자체 지연 측정치가 없어 속도는 추정값입니다.",
+      "tuning": [
+        {
+          "param": "layers",
+          "value": "가변 레이어 RGBA 분해",
+          "range": "재귀 분해 지원",
+          "note": "레이어 수를 지정한 RGBA 분해가 핵심 기능이고, 결과 레이어를 다시 분해할 수도 있습니다.",
+          "source": "https://huggingface.co/Qwen/Qwen-Image-Layered"
+        },
+        {
+          "param": "dependencies",
+          "value": "transformers>=4.51.3 + 최신 diffusers",
+          "range": "-",
+          "note": "카드가 못박은 하드 요구사항입니다 — 낮은 버전은 로드 자체가 안 됩니다.",
+          "source": "https://huggingface.co/Qwen/Qwen-Image-Layered"
+        }
+      ],
+      "quants": [
+        {
+          "fmt": "gguf",
+          "hf": "unsloth/Qwen-Image-Layered-GGUF",
+          "official": false,
+          "runtime": "ComfyUI-GGUF",
+          "note": "community GGUF"
+        },
+        {
+          "fmt": "int8-mlx",
+          "hf": "mzbac/Qwen-Image-Layered-8bit",
+          "official": false,
+          "runtime": "MLX (Apple Silicon)",
+          "note": "8-bit MLX conversion"
+        }
+      ]
     },
     {
       "id": "z-image-turbo",
@@ -258,7 +543,39 @@
         "vram_gb": 22.2,
         "clip_score": 34.88
       },
-      "note": "6B 백본에 Qwen3-4B 텍스트 인코더가 붙어 bf16 상주 20.5GB — 24GB 카드에 들어가는 몇 안 되는 최신 이미지 모델입니다. 8스텝·CFG 미사용 distilled. 흥미로운 실측 결과: 파라미터가 3분의 1인데도 같은 조건에서 Qwen-Image(20B)보다 느립니다(4.02초 대 2.51초). 파라미터 수로 속도를 추정하면 안 된다는 근거라, 이 계산기는 모델별 실측치를 각자의 기준점으로 씁니다."
+      "note": "6B 백본에 Qwen3-4B 텍스트 인코더가 붙어 bf16 상주 20.5GB — 24GB 카드에 들어가는 몇 안 되는 최신 이미지 모델입니다. 8스텝·CFG 미사용 distilled. 흥미로운 실측 결과: 파라미터가 3분의 1인데도 같은 조건에서 Qwen-Image(20B)보다 느립니다(4.02초 대 2.51초). 파라미터 수로 속도를 추정하면 안 된다는 근거라, 이 계산기는 모델별 실측치를 각자의 기준점으로 씁니다.",
+      "tuning": [
+        {
+          "param": "guidance_scale",
+          "value": "0",
+          "range": "0 고정",
+          "note": "증류(Decoupled-DMD) 모델이라 CFG를 꺼야 합니다 — 카드가 'Turbo는 guidance 0'을 명시합니다.",
+          "source": "https://huggingface.co/Tongyi-MAI/Z-Image-Turbo"
+        },
+        {
+          "param": "steps",
+          "value": "9",
+          "range": "8-9",
+          "note": "증류 목표 스텝 수입니다. 더 늘려도 품질이 늘지 않습니다.",
+          "source": "https://huggingface.co/Tongyi-MAI/Z-Image-Turbo"
+        },
+        {
+          "param": "resolution",
+          "value": "1024x1024",
+          "range": "-",
+          "note": "카드 퀵스타트 기본값입니다.",
+          "source": "https://huggingface.co/Tongyi-MAI/Z-Image-Turbo"
+        }
+      ],
+      "quants": [
+        {
+          "fmt": "gguf",
+          "hf": "unsloth/Z-Image-Turbo-GGUF",
+          "official": false,
+          "runtime": "ComfyUI-GGUF",
+          "note": "Q3_K-Q8_0, ~2-6GB"
+        }
+      ]
     },
     {
       "id": "flux2-klein-4b",
@@ -293,7 +610,46 @@
         "vram_gb": 17.9,
         "clip_score": 37.44
       },
-      "note": "3.9B 백본 + Qwen3-4B 텍스트 인코더로 bf16 상주 16GB, 4스텝·CFG 미사용 distilled이라 이 목록에서 가장 가볍고 가장 빠릅니다. 실측 CLIPScore도 37.44로 가장 높았습니다(프롬프트 준수 기준이며 화질 지표는 아닙니다). 가속 실측: torch.compile 1.50배, fp8 단독은 0.83배로 오히려 손해, fp8+compile이 1.72배(장당 0.699초)입니다 — 양자화만 걸면 느려집니다."
+      "note": "3.9B 백본 + Qwen3-4B 텍스트 인코더로 bf16 상주 16GB, 4스텝·CFG 미사용 distilled이라 이 목록에서 가장 가볍고 가장 빠릅니다. 실측 CLIPScore도 37.44로 가장 높았습니다(프롬프트 준수 기준이며 화질 지표는 아닙니다). 가속 실측: torch.compile 1.50배, fp8 단독은 0.83배로 오히려 손해, fp8+compile이 1.72배(장당 0.699초)입니다 — 양자화만 걸면 느려집니다.",
+      "tuning": [
+        {
+          "param": "steps",
+          "value": "4",
+          "range": "1-4",
+          "note": "가이던스 증류 체크포인트라 4스텝이 기본입니다.",
+          "source": "https://huggingface.co/black-forest-labs/FLUX.2-klein-4B"
+        },
+        {
+          "param": "guidance_scale",
+          "value": "1.0",
+          "range": "1.0 고정",
+          "note": "가이던스가 증류로 내장돼 있어 CFG를 더 걸 필요가 없습니다.",
+          "source": "https://huggingface.co/black-forest-labs/FLUX.2-klein-4B"
+        },
+        {
+          "param": "resolution",
+          "value": "1024x1024",
+          "range": "-",
+          "note": "카드 퀵스타트 기본값입니다.",
+          "source": "https://huggingface.co/black-forest-labs/FLUX.2-klein-4B"
+        }
+      ],
+      "quants": [
+        {
+          "fmt": "fp8",
+          "hf": "black-forest-labs/FLUX.2-klein-4b-fp8",
+          "official": true,
+          "runtime": "diffusers / ComfyUI",
+          "note": "official single-file fp8, 4.07GB"
+        },
+        {
+          "fmt": "int4-svdquant",
+          "hf": "tonera/FLUX.2-klein-4B-Nunchaku",
+          "official": false,
+          "runtime": "Nunchaku (SVDQuant)",
+          "note": "community FP4/INT4"
+        }
+      ]
     },
     {
       "id": "sdxl-base-1.0",
@@ -318,7 +674,39 @@
       "width": 1024,
       "height": 1024,
       "speed_model": "none",
-      "note": "이 목록에서 유일한 UNet 계열(나머지는 전부 DiT)입니다. UNet은 파라미터가 저해상도 블록에 몰려 있어 '모든 latent 토큰에 전체 파라미터를 적용한다'는 DiT용 계산식이 실제보다 10배 이상 부풀립니다. 자체 벤치마크도 없어서 속도는 아예 추정하지 않습니다 — VRAM 적합성만 정확히 계산합니다. 텍스트 인코더 두 개(CLIP-L 0.12B + OpenCLIP bigG 0.69B) 합산 0.82B, bf16 상주 약 6.9GB로 소비자용 카드에서도 여유 있게 돌아갑니다."
+      "note": "이 목록에서 유일한 UNet 계열(나머지는 전부 DiT)입니다. UNet은 파라미터가 저해상도 블록에 몰려 있어 '모든 latent 토큰에 전체 파라미터를 적용한다'는 DiT용 계산식이 실제보다 10배 이상 부풀립니다. 자체 벤치마크도 없어서 속도는 아예 추정하지 않습니다 — VRAM 적합성만 정확히 계산합니다. 텍스트 인코더 두 개(CLIP-L 0.12B + OpenCLIP bigG 0.69B) 합산 0.82B, bf16 상주 약 6.9GB로 소비자용 카드에서도 여유 있게 돌아갑니다.",
+      "tuning": [
+        {
+          "param": "guidance_scale",
+          "value": "7.5",
+          "range": "7-9",
+          "note": "증류가 아닌 고전 CFG 모델의 표준 기본값입니다.",
+          "source": "https://huggingface.co/stabilityai/stable-diffusion-xl-base-1.0"
+        },
+        {
+          "param": "steps",
+          "value": "40",
+          "range": "20-50",
+          "note": "카드의 base+refiner 앙상블 예제가 40스텝을 씁니다.",
+          "source": "https://huggingface.co/stabilityai/stable-diffusion-xl-base-1.0"
+        },
+        {
+          "param": "refiner",
+          "value": "denoising_start≈0.8 핸드오프",
+          "range": "선택",
+          "note": "디테일이 필요하면 refiner로 마지막 20%를 넘기는 앙상블 파이프라인이 카드 권장입니다.",
+          "source": "https://huggingface.co/stabilityai/stable-diffusion-xl-base-1.0"
+        }
+      ],
+      "quants": [
+        {
+          "fmt": "gguf",
+          "hf": "gpustack/stable-diffusion-xl-base-1.0-GGUF",
+          "official": false,
+          "runtime": "stable-diffusion.cpp",
+          "note": "Q4_K-Q8_0"
+        }
+      ]
     }
   ]
 }

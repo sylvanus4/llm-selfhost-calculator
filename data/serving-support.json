@@ -1,6 +1,6 @@
 {
   "_note": "Serving-readiness matrix for the NON-LLM modalities (image, video, speech). Three engines, and the distinction between them matters more than usual here. `pytorch` is the reference path — diffusers for image/video, transformers or a model-specific package for speech; diffusers ships no HTTP server, so this is the library you wrap yourself. `vllm` splits in two: CORE vLLM serves input-audio ASR through /v1/audio/transcriptions and serves NO diffusion and NO text-to-speech, while the separate official extension vLLM-Omni serves diffusion and TTS — reporting those as plain 'vLLM support' would be wrong, so the `via` field always says which. `tensorrt` splits in THREE: TensorRT-LLM's VisualGen (beta, 2026-02, diffusion), the older TensorRT demo/Diffusion engine-build path, and TensorRT-Edge-LLM (a Jetson/DRIVE repo that is the only place Qwen3-ASR and Qwen3-TTS appear) — again `via` disambiguates. Tiers: native = listed by exact checkpoint name in the engine's own support table; partial = the family is listed but our exact revision/format is not, or it works only under stated constraints; custom = works but via the vendor's own repo rather than a general engine; unsupported = affirmatively absent from the engine's list; unknown = we could not verify either way and refuse to guess.",
-  "_updated": "2026-08-10",
+  "_updated": "2026-08-12",
   "engines": {
     "pytorch": {
       "label": "PyTorch",
@@ -427,8 +427,8 @@
         "lib": "nemo_toolkit[asr]",
         "pipeline": "EncDecRNNTBPEModelWithPrompt",
         "caveats": [
-          "transformers가 아니라 NeMo 생태계이고 격리 venv가 필요합니다.",
-          "언어 프롬프트는 set_inference_prompt(PromptStreamingMixin)로만 전달됩니다 — 오프라인 transcribe()는 그 값을 읽지 않아 배치 전사로는 쓸 수 없습니다."
+          "transformers가 아니라 NeMo 생태계입니다 — 정식 릴리스가 아니라 git main 설치(nemo_toolkit[asr])가 필요하고 Python 3.10은 미지원입니다.",
+          "언어 프롬프트는 set_inference_prompt(PromptStreamingMixin)로만 전달됩니다 — 오프라인 transcribe()가 이를 읽지 않는 버그는 NVIDIA 이슈 트래커에서도 미해결로 확인됩니다. 정상 경로는 cache-aware 스트리밍 추론 스크립트(att_context_size로 지연·처리량 조절)입니다."
         ]
       },
       "vllm": {
@@ -440,7 +440,7 @@
       "tensorrt": {
         "tier": "unknown",
         "caveats": [
-          "TensorRT-LLM이 최적화할 수 있다는 일반적 마케팅 문구는 있으나 구체적 예제나 체크포인트 변환 경로를 찾지 못했습니다. NVIDIA 자체 안내는 NeMo + Triton을 가리킵니다."
+          "TensorRT-LLM 변환 경로는 확인되지 않습니다. NVIDIA의 프로덕션 경로는 NIM 컨테이너 nemotron-asr-streaming(스트리밍 저지연·고처리량·오프라인 3모드)이며 내부적으로 NeMo/Riva 스택입니다."
         ]
       }
     },
@@ -508,8 +508,9 @@
         "tier": "unsupported",
         "lib": "cosyvoice",
         "caveats": [
-          "현재 스택에서 합성이 되지 않습니다 — torch 2.3 시절 코드가 torch 2.11 오디오 API에서 torchcodec 예외로 깨집니다(9라운드 확인).",
-          "funasr가 아니라 cosyvoice 패키지이고, 벤더 저장소를 tarball로 받아야 합니다(잡 이미지에 git이 없음)."
+          "현재 스택에서 합성이 되지 않습니다 — torch 2.3 시절 코드가 torch 2.11 오디오 API에서 torchcodec 예외로 깨집니다(9라운드 확인). 벤더 핀(torch 2.3.1) 격리 환경에서만 동작합니다.",
+          "funasr가 아니라 cosyvoice 패키지이고, 벤더 저장소를 tarball로 받아야 합니다(잡 이미지에 git이 없음).",
+          "사전 화자 모드가 없는 것은 설계입니다 — CosyVoice3는 zero-shot(ref_audio+ref_text) 전용이라 list_available_spks()가 빈 배열인 게 정상입니다."
         ]
       },
       "vllm": {
@@ -518,21 +519,25 @@
         "served_id": "FunAudioLLM/Fun-CosyVoice3-0.5B-2512",
         "docs": "https://docs.vllm.ai/projects/vllm-omni/en/latest/models/supported_models/",
         "caveats": [
-          "⭐ 로컬 패키지 경로는 막혀 있지만 vLLM-Omni가 정확히 이 체크포인트를 등재하고 있습니다 — 우리 백로그의 'CosyVoice3 실행 불가'를 우회할 후보 경로입니다(미검증)."
+          "vLLM-Omni가 정확히 이 체크포인트를 구현·등재하고 있습니다 — vllm serve FunAudioLLM/Fun-CosyVoice3-0.5B-2512 --omni (talker+flow-matching 2단, 24kHz, 스트리밍 /v1/audio/speech/stream). 벤더의 torch 2.3 핀 스택을 완전히 우회합니다(자체 실측은 아직 없음)."
         ]
       },
       "tensorrt": {
         "tier": "unknown",
         "caveats": [
-          "CosyVoice의 TensorRT-LLM 런타임 지원을 주장하는 2차 출처가 있으나 공식 문서·예제에서 확인되지 않습니다."
+          "TensorRT-LLM 가속은 CosyVoice2 기준으로만 문서화돼 있고 CosyVoice3 확인이 없습니다. sherpa-onnx도 미구현(기능 요청 오픈) 상태입니다."
         ]
       }
     },
     "qwen3-tts-12hz-1.7b": {
       "pytorch": {
-        "tier": "unsupported",
+        "tier": "custom",
+        "lib": "qwen-tts",
+        "pipeline": "Qwen3TTSModel",
+        "docs": "https://github.com/QwenLM/Qwen3-TTS",
         "caveats": [
-          "transformers에 qwen3_tts 모델 타입이 없고 공개된 전용 패키지도 없어 로드 경로가 없습니다."
+          "transformers 코어에는 qwen3_tts 모델 타입이 없습니다 — 공식 파이썬 패키지 qwen-tts(PyPI 0.1.1, transformers 4.57.3 핀)가 로드 경로입니다.",
+          "CUDA bf16 + FlashAttention 2 권장이고 배치 합성과 스트리밍(엔드투엔드 97ms) 생성을 지원합니다. ThakiCloud는 이 패키지로 실동작을 확인했습니다."
         ]
       },
       "vllm": {
@@ -541,7 +546,7 @@
         "served_id": "Qwen/Qwen3-TTS-12Hz-1.7B-Base",
         "docs": "https://docs.vllm.ai/projects/vllm-omni/en/latest/models/supported_models/",
         "caveats": [
-          "⭐ vLLM-Omni가 Qwen3-TTS 변형들(Base·CustomVoice·VoiceDesign)을 등재하고 있어 현재 알려진 유일한 서빙 경로입니다(미검증)."
+          "vLLM-Omni가 Qwen3-TTS 시리즈(Base·CustomVoice·VoiceDesign)를 day-0로 등재하고 있습니다(/v1/audio/speech). 프로덕션 서빙은 이 경로가 정본입니다(자체 실측은 아직 없음)."
         ]
       },
       "tensorrt": {
@@ -549,7 +554,8 @@
         "via": "trt-edge-llm",
         "docs": "https://nvidia.github.io/TensorRT-Edge-LLM/latest/user_guide/getting_started/supported-models.html",
         "caveats": [
-          "메인라인이 아닌 NVIDIA/TensorRT-Edge-LLM에 Qwen3-TTS-12Hz-0.6B/1.7B-CustomVoice가 등재돼 있습니다 — 엣지 대상의 별도 코드베이스입니다."
+          "메인라인이 아닌 NVIDIA/TensorRT-Edge-LLM에 Qwen3-TTS-12Hz-0.6B/1.7B-CustomVoice가 등재돼 있습니다 — 엣지 대상의 별도 코드베이스입니다.",
+          "메인라인 TensorRT-LLM은 멀티코드북 오디오 토큰 생성을 샘플러가 지원하지 않아 미지원입니다(기능 요청 이슈 오픈)."
         ]
       }
     }

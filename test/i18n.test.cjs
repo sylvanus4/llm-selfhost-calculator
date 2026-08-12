@@ -57,6 +57,8 @@ const mediaModels = JSON.parse(fs.readFileSync(path.join(root, "data/media-model
 for (const m of mediaModels) {
   if (m.note) surface.add(m.note);
   if (m.blocked && m.blocked.reason) surface.add(m.blocked.reason);
+  for (const t of m.tuning || []) if (/[가-힣]/.test(t.note || "")) surface.add(t.note);
+  for (const q of m.quants || []) if (/[가-힣]/.test(q.note || "")) surface.add(q.note);
 }
 
 // Speech models + the non-LLM serving matrix: notes, blocked reasons and every engine caveat
@@ -65,6 +67,8 @@ const speechModels = JSON.parse(fs.readFileSync(path.join(root, "data/speech-mod
 for (const m of speechModels) {
   if (m.note) surface.add(m.note);
   if (m.blocked && m.blocked.reason) surface.add(m.blocked.reason);
+  for (const t of m.tuning || []) if (/[가-힣]/.test(t.note || "")) surface.add(t.note);
+  for (const q of m.quants || []) if (/[가-힣]/.test(q.note || "")) surface.add(q.note);
 }
 const serving = JSON.parse(fs.readFileSync(path.join(root, "data/serving-support.json")));
 const hangul = /[가-힣]/;
