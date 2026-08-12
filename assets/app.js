@@ -757,7 +757,7 @@ function renderMPlaceQuantLadder(model, gpu) {
     // Media resets int4 back to fp16 (no DiT serving path at int4 in our engines) — keep that
     // row visible as information but not selectable.
     const dead = !speech && x.id === "int4";
-    return `<button type="button" class="ladder-row${sel ? " sel" : ""}"${dead ? " disabled" : ""} data-mq="${x.id}" aria-pressed="${sel}">
+    return `<button type="button" class="ladder-row${sel ? " sel" : ""}"${dead ? ` disabled title="${esc(tr("mplace.int4dead"))}"` : ""} data-mq="${x.id}" aria-pressed="${sel}">
       <span class="lr-label">${esc(x.label)}</span>
       <span class="lr-bar"><span class="lr-fit" style="width:${fitPct}%"></span><span class="lr-over" style="width:${overPct}%"></span><span class="lr-usable" style="left:${usablePct}%"></span></span>
       <span class="lr-gb ${x.fits ? "" : "over"}">${fmt(x.totalGB, 1)} GB</span>
@@ -1273,9 +1273,15 @@ function applyCategory(cat) {
     t.hidden = media ? t.dataset.cat !== "media" : t.dataset.cat !== "llm";
   });
   // Diffusion pipelines are served at bf16 or fp8; nobody runs a DiT at INT4/AWQ the way they do
-  // an LLM, and our own measurements are bf16. Carrying the LLM tab's int4 default across would
-  // quietly show a VRAM figure for a configuration that does not exist in practice.
-  if (media && ["int4", "nvfp4", "mxfp4"].includes(el("quant").value)) el("quant").value = "fp16";
+  // an LLM, and our own measurements are bf16. Speech DOES ship INT4 (GGUF / CT2 / MLX) but has
+  // no NVFP4/MXFP4 path. Disabling the options — not just resetting once on switch — keeps the
+  // dropdown, the quant ladder, and the compute in agreement at all times: before this, a user
+  // could still pick INT4 from the dropdown mid-category and get a figure for a configuration
+  // the ladder itself marks as nonexistent.
+  const allowedQuants = speech ? ["fp16", "fp8", "int8", "int4"]
+    : diffusion ? ["fp16", "fp8", "int8"] : null;
+  [...el("quant").options].forEach(o => { o.disabled = !!allowedQuants && !allowedQuants.includes(o.value); });
+  if (allowedQuants && !allowedQuants.includes(el("quant").value)) el("quant").value = "fp16";
   if (diffusion) applyMediaModelDefaults();
   switchResultTab(media ? "media" : "calc");
 }

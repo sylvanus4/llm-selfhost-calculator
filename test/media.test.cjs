@@ -428,6 +428,13 @@ console.log("\nhierarchy gate:");
     C.mediaQuantLadder(media[0], anyGpu, {}).every(x => !("tokS" in x) && !("secondsPerItem" in x)));
   ok("the ladder UI block exists and is wired", /mplaceQuantLadder/.test(html) && /renderMPlaceQuantLadder/.test(app));
   ok("the tuning UI block exists and is wired", /mediaTuningBlock/.test(html) && /renderMediaTuning/.test(app));
+  // The dropdown must be gated per category, not just reset once on switch: without option
+  // disabling a user can pick INT4/NVFP4/MXFP4 from the dropdown mid-category and get a VRAM
+  // figure for a configuration the ladder itself marks as nonexistent.
+  ok("quant dropdown options are disabled per category (not only reset on switch)",
+    /allowedQuants/.test(app) && /o\.disabled\s*=/.test(app) &&
+    /speech \? \["fp16", "fp8", "int8", "int4"\]/.test(app) &&
+    /diffusion \? \["fp16", "fp8", "int8"\]/.test(app));
 }
 
 console.log(`\nmedia+speech+serving: ${pass} passed, ${fail} failed`);
