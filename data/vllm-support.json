@@ -1,7 +1,7 @@
 {
   "_note": "vLLM 서빙 준비도 판정 근거. native_architectures = vLLM이 전용 커널로 네이티브 지원하는 HF config.json architectures[] 문자열의 대표 목록(전수 아님 — 매칭되면 高신뢰, 미매칭이라고 미지원은 아님). transformers 백엔드가 이제 네이티브 속도에 도달해, 네이티브 목록에 없어도 표준 아키텍처면 --model-impl transformers로 near-native 구동 가능. quant_methods = --quantization 플래그로 받는 체크포인트 양자화 포맷. 이 파일은 vLLM 릴리스마다 갱신한다(vllm_version 핀). 출처: vLLM supported_models 문서 + HF native-speed-vllm-transformers-backend 블로그(2026-07).",
-  "_updated": "2026-08-11",
-  "vllm_version": "0.27.0",
+  "_updated": "2026-08-12",
+  "vllm_version": "0.27.1",
   "docs": "https://docs.vllm.ai/en/latest/models/supported_models/",
   "native_architectures": [
     "LlamaForCausalLM",
@@ -55,7 +55,7 @@
   "versions": [
     {
           "version": "0.27",
-          "latest_patch": "0.27.0",
+          "latest_patch": "0.27.1",
           "released": "2026-08",
           "docs": "https://docs.vllm.ai/en/latest/models/supported_models/",
           "highlights": [
