@@ -13,6 +13,7 @@
   "arch_support": {
     "InklingForConditionalGeneration": {"tier": "native", "caveats": ["Day-0 지원 · NVIDIA는 BF16+NVFP4 체크포인트, AMD는 BF16만 — MI35X는 --attention-backend triton --moe-runner-backend aiter 필요"]},
     "KimiK3ForConditionalGeneration": {"tier": "native", "min_ver": "0.5.17", "caveats": ["Day-0 지원 v0.5.17 — DCP+DSpark 스펙 디코딩, chunked-prefill PP+TP 디코드, KDA-aware prefix caching, HiCache L2, 양자화 가중치 위 LoRA · NVIDIA GB300·AMD MI35X 검증"]},
+    "Qwen3_5ForConditionalGeneration": {"tier": "native", "min_ver": "0.5.13", "caveats": ["하이브리드 GDN(Gated DeltaNet) — SGLang v0.5.13+ FlashInfer GDN/CuTeDSL 커널로 지원, 상대적으로 신규 경로라 최신 빌드 권장(--mamba-radix-cache-strategy v2 NVIDIA 권장)"]},
     "LlamaForCausalLM": {"tier": "native"},
     "Llama4ForConditionalGeneration": {"tier": "native", "caveats": ["멀티모달 Llama 4 — 비전 경로 포함"]},
     "MistralForCausalLM": {"tier": "native"},
@@ -96,6 +97,7 @@
     "_default": {"tool_parser": null, "reasoning_parser": null, "note": {"ko": "이 아키텍처의 SGLang 네이티브 툴 파서는 미확인 — chat_template와 SGLang 문서에서 --tool-call-parser 값을 확인하세요.", "en": "No confirmed SGLang native tool parser for this architecture — check the chat_template and SGLang docs for --tool-call-parser."}},
     "InklingForConditionalGeneration": {"tool_parser": "inkling", "reasoning_parser": "inkling", "note": {"ko": "SGLang day-0 네이티브 지원 — --tool-call-parser inkling --reasoning-parser inkling (vLLM과 동일 파서명, SGLang 공식 쿡북 확인).", "en": "SGLang day-0 native support — --tool-call-parser inkling --reasoning-parser inkling (same parser name as vLLM, confirmed via SGLang official cookbook)."}},
     "KimiK3ForConditionalGeneration": {"tool_parser": "kimi_k3", "reasoning_parser": "kimi_k3", "note": {"ko": "SGLang day-0 네이티브 지원 v0.5.17 — --tool-call-parser kimi_k3 --reasoning-parser kimi_k3 (SGLang 공식 쿡북 확인).", "en": "SGLang day-0 native support in v0.5.17 — --tool-call-parser kimi_k3 --reasoning-parser kimi_k3 (confirmed via SGLang official cookbook)."}},
+    "Qwen3_5ForConditionalGeneration": {"tool_parser": "qwen3_coder", "reasoning_parser": "qwen3", "note": {"ko": "SGLang v0.5.13+ 네이티브 지원 — --tool-call-parser qwen3_coder --reasoning-parser qwen3 (SGLang 공식 쿡북 확인).", "en": "SGLang v0.5.13+ native support — --tool-call-parser qwen3_coder --reasoning-parser qwen3 (confirmed via SGLang official cookbook)."}},
     "MuseGlimmerForConditionalGeneration": {"tool_parser": "muse", "reasoning_parser": null, "note": {"ko": "--tool-call-parser muse — SGLang 소스 레지스트리(muse_glimmer_detector, ToolCallParserEnum \"muse\")에서 확인. 문서 페이지에는 아직 미등재, reasoning 파서는 미확인.", "en": "--tool-call-parser muse — confirmed in the SGLang source registry (muse_glimmer_detector, ToolCallParserEnum \"muse\"). Not yet on the docs page; no confirmed reasoning parser."}},
     "LlamaForCausalLM": {"tool_parser": "llama3", "reasoning_parser": null},
     "Llama4ForConditionalGeneration": {"tool_parser": "llama3", "reasoning_parser": null},

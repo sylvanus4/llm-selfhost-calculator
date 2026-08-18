@@ -679,6 +679,13 @@
 
   // Korean-source -> English for strings that live in the data files (translated at render).
   const DATA = {
+    // --- data/models.json: qwen3.8-27b ---
+    "하이브리드 Gated DeltaNet(선형)/Gated Attention 4:1 교차 — 64층 중 풀어텐션(KV 보유) 16개 층만, 나머지 48층은 선형어텐션(RNN형 고정 상태) · 네이티브 비전-언어(이미지·비디오) 멀티모달 · 262,144 컨텍스트(최대 1M 확장 가능)":
+      "Hybrid Gated DeltaNet (linear)/Gated Attention in a 4:1 interleave — only 16 of 64 layers run full attention and carry KV, the other 48 run linear attention with a constant recurrent state · native vision-language (image/video) multimodal · 262,144 context (extensible up to 1M)",
+    "하이브리드 GDN(Gated DeltaNet) 아키텍처 — vLLM 0.17+에서 자체 Qwen3_5Config로 네이티브 파싱(FlashInfer/CuTeDSL GDN 커널), 최신 버전 권장":
+      "Hybrid GDN (Gated DeltaNet) architecture — natively parsed via vLLM's own Qwen3_5Config since 0.17+ (FlashInfer/CuTeDSL GDN kernels); a recent version is recommended",
+    "하이브리드 GDN(Gated DeltaNet) — SGLang v0.5.13+ FlashInfer GDN/CuTeDSL 커널로 지원, 상대적으로 신규 경로라 최신 빌드 권장(--mamba-radix-cache-strategy v2 NVIDIA 권장)":
+      "Hybrid GDN (Gated DeltaNet) — supported via SGLang v0.5.13+ FlashInfer GDN/CuTeDSL kernels; a relatively new path, so a recent build is recommended (--mamba-radix-cache-strategy v2 recommended on NVIDIA)",
     // --- data/speech-models.json + data/serving-support.json ---
     "TensorRT 저장소의 demo/Diffusion 경로(TensorRT-LLM이 아님) — SDXL·SDXL Turbo가 명시적으로 등재돼 있습니다.":
       "The demo/Diffusion path in the TensorRT repo (not TensorRT-LLM) — SDXL and SDXL Turbo are listed explicitly.",
