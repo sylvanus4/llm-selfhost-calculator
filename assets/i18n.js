@@ -679,6 +679,14 @@
 
   // Korean-source -> English for strings that live in the data files (translated at render).
   const DATA = {
+    // --- data/models.json: qwen3.8-2.4t-a95b ---
+    "하이브리드 Gated DeltaNet(선형)/Gated Attention 4:1 교차 — 92층 중 풀어텐션(KV 보유) 23개 층만, 나머지 69층은 선형어텐션(RNN형 고정 상태) · MoE(512 전문가 중 top-10 라우팅 + 공유 1, 2.4T 중 95B active — 모델명 공식 표기 기준) · 262,144 컨텍스트(최대 1,010,000 확장 가능) · 텍스트 전용(멀티모달 미지원) · 항상 사고 모드(reasoning 비활성화 불가, reasoning_effort 파라미터로 강도 조절) · Qwen3.8-Max License(MAU/매출 임계 조건부 상업 라이선스, 조건 확인 필요)":
+      "Hybrid Gated DeltaNet (linear)/Gated Attention in a 4:1 interleave — only 23 of 92 layers run full attention and carry KV, the other 69 run linear attention with a constant recurrent state · MoE (top-10 of 512 experts + 1 shared, 95B active of 2.4T — per the model's official naming) · 262,144 context (extensible up to 1,010,000) · text-only (no multimodal) · thinking mode always on (reasoning cannot be disabled; strength tunable via reasoning_effort) · Qwen3.8-Max License (conditional commercial license with MAU/revenue thresholds — check terms)",
+    "네이티브 목록 미등록 → Transformers 백엔드(--model-impl transformers)로 near-native 시도":
+      "Not on the native list → attempted near-native via the Transformers backend (--model-impl transformers)",
+    "Qwen3_5MoeForCausalLM — 엔진 레지스트리 미등록, 지원 확인/실측 필요":
+      "Qwen3_5MoeForCausalLM — not registered in the engine's architecture list, support unconfirmed/needs a real test",
+
     // --- data/models.json: qwen3.8-27b ---
     "하이브리드 Gated DeltaNet(선형)/Gated Attention 4:1 교차 — 64층 중 풀어텐션(KV 보유) 16개 층만, 나머지 48층은 선형어텐션(RNN형 고정 상태) · 네이티브 비전-언어(이미지·비디오) 멀티모달 · 262,144 컨텍스트(최대 1M 확장 가능)":
       "Hybrid Gated DeltaNet (linear)/Gated Attention in a 4:1 interleave — only 16 of 64 layers run full attention and carry KV, the other 48 run linear attention with a constant recurrent state · native vision-language (image/video) multimodal · 262,144 context (extensible up to 1M)",
