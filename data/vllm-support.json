@@ -1,6 +1,6 @@
 {
   "_note": "vLLM 서빙 준비도 판정 근거. native_architectures = vLLM이 전용 커널로 네이티브 지원하는 HF config.json architectures[] 문자열의 대표 목록(전수 아님 — 매칭되면 高신뢰, 미매칭이라고 미지원은 아님). transformers 백엔드가 이제 네이티브 속도에 도달해, 네이티브 목록에 없어도 표준 아키텍처면 --model-impl transformers로 near-native 구동 가능. quant_methods = --quantization 플래그로 받는 체크포인트 양자화 포맷. 이 파일은 vLLM 릴리스마다 갱신한다(vllm_version 핀). 출처: vLLM supported_models 문서 + HF native-speed-vllm-transformers-backend 블로그(2026-07).",
-  "_updated": "2026-08-12",
+  "_updated": "2026-08-22",
   "vllm_version": "0.27.1",
   "docs": "https://docs.vllm.ai/en/latest/models/supported_models/",
   "native_architectures": [
@@ -15,6 +15,8 @@
     "Qwen3VLForConditionalGeneration",
     "Qwen2VLForConditionalGeneration",
     "Qwen3_5ForConditionalGeneration",
+    "Qwen3_5MoeForCausalLM",
+    "Qwen3_5MoeForConditionalGeneration",
     "Gemma2ForCausalLM",
     "Gemma3ForCausalLM",
     "Gemma3ForConditionalGeneration",
@@ -50,6 +52,7 @@
     "Olmo2ForCausalLM",
     "ExaoneForCausalLM",
     "Exaone4ForCausalLM",
+    "ExaoneMoeForCausalLM",
     "InklingForConditionalGeneration",
     "KimiK3ForConditionalGeneration"
   ],
@@ -97,6 +100,7 @@
     "SolarOpen2ForCausalLM": {"tool_parser": "solar_open2", "reasoning_parser": null, "note": {"ko": "모델 카드 명시 — --tool-call-parser solar_open2 --enable-auto-tool-choice.", "en": "Confirmed on the model card — --tool-call-parser solar_open2 --enable-auto-tool-choice."}},
     "InklingForConditionalGeneration": {"tool_parser": "inkling", "reasoning_parser": "inkling", "note": {"ko": "가변 reasoning-effort(thinking) 모델 — --tool-call-parser inkling --reasoning-parser inkling. Day-0 vLLM 공식 지원(BF16·NVFP4 체크포인트 둘 다).", "en": "Variable reasoning-effort (thinking) model — --tool-call-parser inkling --reasoning-parser inkling. Official vLLM Day-0 support (both BF16 and NVFP4 checkpoints)."}},
     "KimiK3ForConditionalGeneration": {"tool_parser": "kimi_k3", "reasoning_parser": "kimi_k3", "note": {"ko": "vLLM 0.27.0에서 신규 네이티브 등록(KimiK3ForConditionalGeneration) — --tool-call-parser kimi_k3 --reasoning-parser kimi_k3. 896-expert MoE + KDA/Gated-MLA 하이브리드 어텐션, MXFP4 가중치는 Blackwell 계열 권장.", "en": "Newly registered native in vLLM 0.27.0 (KimiK3ForConditionalGeneration) — --tool-call-parser kimi_k3 --reasoning-parser kimi_k3. 896-expert MoE with KDA/Gated-MLA hybrid attention; MXFP4 weights recommend Blackwell-class hardware."}},
+    "ExaoneMoeForCausalLM": {"tool_parser": "qwen3_xml", "reasoning_parser": "qwen3", "note": {"ko": "K-EXAONE-2.0-750B-A37B 모델 카드 명시(vLLM 섹션) — --tool-call-parser qwen3_xml --reasoning-parser qwen3 --enable-auto-tool-choice.", "en": "K-EXAONE-2.0-750B-A37B model card, vLLM section — --tool-call-parser qwen3_xml --reasoning-parser qwen3 --enable-auto-tool-choice."}},
     "LlamaForCausalLM": {"tool_parser": "llama3_json", "reasoning_parser": null},
     "Llama4ForConditionalGeneration": {"tool_parser": "llama4_pythonic", "reasoning_parser": null},
     "MistralForCausalLM": {"tool_parser": "mistral", "reasoning_parser": null, "note": {"ko": "Mistral 툴 템플릿 권장 — --tool-call-parser mistral (mistral_common 토크나이저 사용 시 정확도↑).", "en": "Prefer the Mistral tool template — --tool-call-parser mistral (more accurate with the mistral_common tokenizer)."}},
@@ -108,6 +112,7 @@
     "Qwen3VLForConditionalGeneration": {"tool_parser": "hermes", "reasoning_parser": "qwen3"},
     "Qwen2VLForConditionalGeneration": {"tool_parser": "hermes", "reasoning_parser": null},
     "Qwen3_5ForConditionalGeneration": {"tool_parser": "qwen3_coder", "reasoning_parser": "qwen3", "note": {"ko": "Qwen3.5 계열 하이브리드 GDN 아키텍처(Qwen3.8 포함) — vLLM 공식 레시피 기준 --tool-call-parser qwen3_coder --reasoning-parser qwen3.", "en": "Qwen3.5-family hybrid GDN architecture (incl. Qwen3.8) — per vLLM's official recipe: --tool-call-parser qwen3_coder --reasoning-parser qwen3."}},
+    "Qwen3_5MoeForConditionalGeneration": {"tool_parser": "qwen3_xml", "reasoning_parser": "qwen3", "note": {"ko": "Ornith-1.5-397B 모델 카드 명시(vLLM 섹션) — --tool-call-parser qwen3_xml --reasoning-parser qwen3. Qwen3_5MoeForCausalLM(텍스트 MoE)은 모델 카드에 파서 미기재 — _default.", "en": "Ornith-1.5-397B model card, vLLM section — --tool-call-parser qwen3_xml --reasoning-parser qwen3. The text-MoE variant (Qwen3_5MoeForCausalLM) has no parser on its card — falls to _default."}},
     "DeepseekV2ForCausalLM": {"tool_parser": "deepseek_v3", "reasoning_parser": "deepseek_r1"},
     "DeepseekV3ForCausalLM": {"tool_parser": "deepseek_v3", "reasoning_parser": "deepseek_r1", "note": {"ko": "DeepSeek V3/R1 계열 — 툴은 deepseek_v3, reasoning은 deepseek_r1 파서.", "en": "DeepSeek V3/R1 family — deepseek_v3 for tools, deepseek_r1 for reasoning."}},
     "DeepseekV4ForCausalLM": {"tool_parser": "deepseek_v3", "reasoning_parser": "deepseek_r1", "note": {"ko": "V4도 V3 계열 파서를 재사용(툴 deepseek_v3 · reasoning deepseek_r1). vLLM 0.25+에서 확인.", "en": "V4 reuses the V3-family parsers (tool deepseek_v3 · reasoning deepseek_r1). Verify on vLLM 0.25+."}},

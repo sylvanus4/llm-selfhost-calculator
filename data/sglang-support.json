@@ -1,9 +1,9 @@
 {
   "_note": "SGLang 서빙 준비도 판정 근거. arch_support = 모델의 HF config.json architectures[] 대표 문자열 → SGLang 지원 등급 매핑(전수 아님 — 매칭되면 高신뢰, 미매칭이라고 완전 미지원은 아님). SGLang은 vLLM과 달리 python 모델 파일 레지스트리(sglang/srt/models) 기반이라, 레지스트리에 있으면 native. DeepSeek/MLA + DP-attention은 SGLang의 대표 강점 경로. 하이브리드 Mamba-2(NemotronH/GraniteMoeHybrid)와 신규 MoE는 vLLM보다 뒤늦게 들어와 partial로 본다. hardware = SGLang은 NVIDIA(CUDA)·AMD(ROCm)에서 돌고 Apple/NPU는 미지원. quant_methods = --quantization 플래그로 받는 체크포인트 양자화 포맷. 이 파일은 SGLang 릴리스마다 갱신한다(version 핀). 출처: SGLang supported_models 문서 + 릴리스 노트(2026-07). 모든 등급은 계획용 근사 — 실측 벤치 권장.",
-  "_updated": "2026-08-08",
-  "version": "0.5.17",
+  "_updated": "2026-08-22",
+  "version": "0.5.18",
   "docs": "https://docs.sglang.ai/supported_models.html",
-  "image": "lmsysorg/sglang:v0.5.17",
+  "image": "lmsysorg/sglang:v0.5.18",
   "default_port": 30000,
   "hardware": {
     "supported_kinds": ["gpu", "amd"],
@@ -13,7 +13,10 @@
   "arch_support": {
     "InklingForConditionalGeneration": {"tier": "native", "caveats": ["Day-0 지원 · NVIDIA는 BF16+NVFP4 체크포인트, AMD는 BF16만 — MI35X는 --attention-backend triton --moe-runner-backend aiter 필요"]},
     "KimiK3ForConditionalGeneration": {"tier": "native", "min_ver": "0.5.17", "caveats": ["Day-0 지원 v0.5.17 — DCP+DSpark 스펙 디코딩, chunked-prefill PP+TP 디코드, KDA-aware prefix caching, HiCache L2, 양자화 가중치 위 LoRA · NVIDIA GB300·AMD MI35X 검증"]},
+    "MuseGlimmerForConditionalGeneration": {"tier": "native", "min_ver": "0.5.18", "caveats": ["SGLang v0.5.18 Day-0 네이티브 등록(muse_glimmer.py) — 공식 릴리스 노트 'Muse Glimmer' 등재 · --tool-call-parser muse"]},
     "Qwen3_5ForConditionalGeneration": {"tier": "native", "min_ver": "0.5.13", "caveats": ["하이브리드 GDN(Gated DeltaNet) — SGLang v0.5.13+ FlashInfer GDN/CuTeDSL 커널로 지원, 상대적으로 신규 경로라 최신 빌드 권장(--mamba-radix-cache-strategy v2 NVIDIA 권장)"]},
+    "Qwen3_5MoeForConditionalGeneration": {"tier": "native", "min_ver": "0.5.13", "caveats": ["SGLang v0.5.13+ 네이티브(qwen3_5.py EntryClass) — Qwen3.5 계열 하이브리드 GDN 멀티모달 MoE, dense와 동일 경로라 최신 빌드 권장"]},
+    "Qwen3_5MoeForCausalLM": {"tier": "native", "min_ver": "0.5.17", "caveats": ["SGLang v0.5.17 신규 네이티브(qwen3_5_text.py EntryClass) — Qwen3.5 계열 텍스트 전용 하이브리드 GDN MoE"]},
     "LlamaForCausalLM": {"tier": "native"},
     "Llama4ForConditionalGeneration": {"tier": "native", "caveats": ["멀티모달 Llama 4 — 비전 경로 포함"]},
     "MistralForCausalLM": {"tier": "native"},
@@ -57,15 +60,16 @@
   "versions": [
     {
       "version": "0.5",
-      "latest_patch": "0.5.17",
+      "latest_patch": "0.5.18",
       "released": "2026-07",
       "docs": "https://docs.sglang.ai/supported_models.html",
       "highlights": [
         {"ko": "Kimi K3(2.8T 파라미터 · 896-expert LatentMoE top-16 · 3584차원 latent space · 69 KDA 선형어텐션+24 MLA 레이어 혼합 · 1M 컨텍스트) Day-0 지원 — DCP+DSpark 스펙 디코딩, KDA-aware prefix caching, HiCache L2 v0.5.17 · DWDP(MoE prefill용 NVLink P2P 전문가 가중치 프리페치로 EP all-to-all 제거, 4×B200 gpt-oss-120b서 DEP4 대비 1.92배) v0.5.17", "en": "Kimi K3 (2.8T-param, 896-expert LatentMoE top-16, 3584-dim latent space, 69 KDA linear-attention layers interleaved with 24 MLA layers, 1M-token context) day-0 support — DCP+DSpark speculative decoding, KDA-aware prefix caching, HiCache L2 in v0.5.17 · DWDP (NVLink P2P expert-weight prefetch for MoE prefill, removes EP all-to-all; 1.92x over DEP4 on 4x B200 gpt-oss-120b) in v0.5.17"},
         {"ko": "DSpark 신뢰도기반 스펙 디코딩(고정 draft 길이 대신 draft confidence로 verify window 크기 결정, DeepSeek-V4-Pro TP8 B300서 383.7 tok/s @accept~5) v0.5.16 · Inkling(975B 멀티모달 MoE, sliding-window+full+Mamba2 혼합 attention) Day-0 지원 v0.5.16", "en": "DSpark confidence-driven speculative decoding (verify window sized from draft confidence instead of fixed length; 383.7 tok/s @accept~5 on DeepSeek-V4-Pro TP8 B300) in v0.5.16 · Inkling (975B multimodal MoE mixing sliding-window/full/Mamba2 attention) Day-0 support in v0.5.16"},
-        {"ko": "UnifiedRadixTree가 SWA/Mamba/DSA 모델 기본 캐시로 전환 + GLM-5.2 prefill CP에서 KV/indexer 캐시 레이어 분할로 랭크당 메모리 ~74%↓ v0.5.16", "en": "UnifiedRadixTree becomes the default cache for SWA/Mamba/DSA models + GLM-5.2 prefill-CP KV/indexer cache layer split cuts per-rank memory ~74% v0.5.16"}
+        {"ko": "UnifiedRadixTree가 SWA/Mamba/DSA 모델 기본 캐시로 전환 + GLM-5.2 prefill CP에서 KV/indexer 캐시 레이어 분할로 랭크당 메모리 ~74%↓ v0.5.16", "en": "UnifiedRadixTree becomes the default cache for SWA/Mamba/DSA models + GLM-5.2 prefill-CP KV/indexer cache layer split cuts per-rank memory ~74% v0.5.16"},
+        {"ko": "Muse Glimmer·Intern-S2-Mobius 신규 네이티브 등록(멀티모달) v0.5.18 · Qwen3.8 계열·Ling-3.0·DeepSeek-V4-Pro cookbook 레시피 추가 v0.5.18 · 기동 시 체크포인트 스테이징 오버랩(--startup-weight-load-mode overlap, Qwen3-32B H100 기동 2.38배↑) · Blackwell FA4 기동 리그레션 수정 + SM12x 전용 FA4 커널 · DSpark/DFLASH 스펙 디코딩 개선(logprobs 지원, draft KV pool sizing, NaN 수정 2건) v0.5.18", "en": "Muse Glimmer and Intern-S2-Mobius newly native (multimodal) v0.5.18 · cookbook recipes for the Qwen3.8 family, Ling-3.0 and DeepSeek-V4-Pro v0.5.18 · overlapped checkpoint staging at startup (--startup-weight-load-mode overlap, up to 2.38x faster Qwen3-32B startup on H100) · FA4 Blackwell startup-regression fix + architecture-owned SM12x FA4 kernels · DSpark/DFLASH speculative decoding improvements (logprobs support, draft KV pool sizing, two NaN fixes) in v0.5.18"}
       ],
-      "notable_flags": ["--tool-call-parser", "--reasoning-parser", "--enable-dp-attention", "--quantization mxfp4", "--dcp-comm-backend", "--dwdp-size"]
+      "notable_flags": ["--tool-call-parser", "--reasoning-parser", "--enable-dp-attention", "--quantization mxfp4", "--dcp-comm-backend", "--dwdp-size", "--startup-weight-load-mode overlap"]
     },
     {
       "version": "0.4",
@@ -98,7 +102,9 @@
     "InklingForConditionalGeneration": {"tool_parser": "inkling", "reasoning_parser": "inkling", "note": {"ko": "SGLang day-0 네이티브 지원 — --tool-call-parser inkling --reasoning-parser inkling (vLLM과 동일 파서명, SGLang 공식 쿡북 확인).", "en": "SGLang day-0 native support — --tool-call-parser inkling --reasoning-parser inkling (same parser name as vLLM, confirmed via SGLang official cookbook)."}},
     "KimiK3ForConditionalGeneration": {"tool_parser": "kimi_k3", "reasoning_parser": "kimi_k3", "note": {"ko": "SGLang day-0 네이티브 지원 v0.5.17 — --tool-call-parser kimi_k3 --reasoning-parser kimi_k3 (SGLang 공식 쿡북 확인).", "en": "SGLang day-0 native support in v0.5.17 — --tool-call-parser kimi_k3 --reasoning-parser kimi_k3 (confirmed via SGLang official cookbook)."}},
     "Qwen3_5ForConditionalGeneration": {"tool_parser": "qwen3_coder", "reasoning_parser": "qwen3", "note": {"ko": "SGLang v0.5.13+ 네이티브 지원 — --tool-call-parser qwen3_coder --reasoning-parser qwen3 (SGLang 공식 쿡북 확인).", "en": "SGLang v0.5.13+ native support — --tool-call-parser qwen3_coder --reasoning-parser qwen3 (confirmed via SGLang official cookbook)."}},
-    "MuseGlimmerForConditionalGeneration": {"tool_parser": "muse", "reasoning_parser": null, "note": {"ko": "--tool-call-parser muse — SGLang 소스 레지스트리(muse_glimmer_detector, ToolCallParserEnum \"muse\")에서 확인. 문서 페이지에는 아직 미등재, reasoning 파서는 미확인.", "en": "--tool-call-parser muse — confirmed in the SGLang source registry (muse_glimmer_detector, ToolCallParserEnum \"muse\"). Not yet on the docs page; no confirmed reasoning parser."}},
+    "MuseGlimmerForConditionalGeneration": {"tool_parser": "muse", "reasoning_parser": null, "note": {"ko": "--tool-call-parser muse — SGLang 소스 레지스트리(muse_glimmer_detector, ToolCallParserEnum \"muse\")에서 확인 · v0.5.18 공식 릴리스 노트에 등재. reasoning 파서는 미확인.", "en": "--tool-call-parser muse — confirmed in the SGLang source registry (muse_glimmer_detector, ToolCallParserEnum \"muse\") · officially listed in the v0.5.18 release notes. No confirmed reasoning parser."}},
+    "Qwen3_5MoeForConditionalGeneration": {"tool_parser": "qwen3_coder", "reasoning_parser": "qwen3", "note": {"ko": "Ornith-1.5-397B 모델 카드 명시(SGLang 섹션) — --tool-call-parser qwen3_coder --reasoning-parser qwen3.", "en": "Ornith-1.5-397B model card, SGLang section — --tool-call-parser qwen3_coder --reasoning-parser qwen3."}},
+    "ExaoneMoeForCausalLM": {"tool_parser": "qwen3_coder", "reasoning_parser": "qwen3", "note": {"ko": "K-EXAONE-2.0-750B-A37B 모델 카드 명시(SGLang 섹션) — --tool-call-parser qwen3_coder --reasoning-parser qwen3. 단 SGLang 네이티브 매칭은 클래스명 case 불일치로 미확인(LG 공식 레시피).", "en": "K-EXAONE-2.0-750B-A37B model card, SGLang section — --tool-call-parser qwen3_coder --reasoning-parser qwen3. Caveat: SGLang native match is unconfirmed due to the class-name case mismatch (LG official recipe)."}},
     "LlamaForCausalLM": {"tool_parser": "llama3", "reasoning_parser": null},
     "Llama4ForConditionalGeneration": {"tool_parser": "llama3", "reasoning_parser": null},
     "MistralForCausalLM": {"tool_parser": "mistral", "reasoning_parser": null},
